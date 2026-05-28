@@ -46,9 +46,12 @@ def transcribe_audio_chunk(audio_bytes: bytes, language: str | None = None) -> s
     return " ".join(seg.text.strip() for seg in segments)
 
 
-def transcribe_file(file_path: str) -> list[dict]:
+def transcribe_file(file_path: str, language: str | None = None) -> list[dict]:
     model = get_upload_model()
-    segments, _ = model.transcribe(file_path, vad_filter=True)
+    kwargs = {"vad_filter": True}
+    if language:
+        kwargs["language"] = language
+    segments, _ = model.transcribe(file_path, **kwargs)
     results = []
     for seg in segments:
         results.append({

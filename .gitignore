@@ -7,3 +7,8 @@ uploads/
 transcripts/
 recordings/
 gitignore/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+static/assets/

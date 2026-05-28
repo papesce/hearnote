@@ -7,20 +7,26 @@ Hearnote is a local-first transcription app powered by Whisper. Record live or u
 ## Features
 
 - **Live Recording** — transcribe in real-time from your microphone or system audio (BlackHole)
-- **Upload MP4** — drop in a video/audio file and get a streaming, timestamped transcript
+- **Upload File** — drop in a video/audio file and get a streaming, timestamped transcript
 - **Streaming transcription** — segments appear one by one as they're processed, with a progress bar and elapsed timer
 - **Cancel** — stop an in-progress upload transcription instantly (kills the process, CPU freed immediately)
-- **AI Summaries** — summarize transcripts locally with Ollama (llama3) or copy a prompt to paste into any AI chat (Copilot, ChatGPT, Claude, etc.)
-- **Preview prompt** — see the full prompt inline before copying
-- **Transcript History** — all sessions saved locally, browsable and deletable
+- **AI Summaries** — summarize transcripts locally with Ollama (llama3) or copy a prompt to paste into any AI chat
+- **Transcript History** — all sessions saved locally, browsable, searchable, and deletable
+- **Re-transcribe** — re-process a recording with a different model or language
 - **Model Selector** — choose between Fast (base), Balanced (small), or Accurate (medium) for live transcription
-- **Language Selector** — pick the language you're listening to, or leave as Auto-detect
-- **Copy to clipboard** — one-click copy of your transcript
+- **Language Selector** — pick the language or leave as Auto-detect
+- **Audio Playback** — play back recordings directly in the app
 
 ## Quick Start
 
 ```bash
+# Install Python dependencies
 uv sync
+
+# Install frontend dependencies & build
+cd frontend && npm install && npm run build && cd ..
+
+# Run the server
 uv run python app.py
 ```
 
@@ -28,17 +34,34 @@ Open http://localhost:8000
 
 ## Development
 
-For auto-reload on file changes (both Python and static files):
+For development with hot-reload (React HMR + Python auto-restart):
 
 ```bash
-./dev.sh          # start dev server
-./dev.sh --open   # start and open browser automatically
-./dev.sh -o       # same, short form
+cd frontend && npm install  # first time only
+./dev.sh                    # starts both servers
+./dev.sh --open             # start and open browser automatically
+./dev.sh -o                 # same, short form
 ```
 
-This starts the server with:
-- Auto-restart on Python file changes (uvicorn `--reload`)
-- Auto browser refresh on HTML/CSS/JS changes (live-reload script injected in dev mode)
+This starts:
+- **FastAPI backend** on port 8000 (auto-restarts on Python changes)
+- **Vite dev server** on port 5173 (React HMR, proxies API/WS to backend)
+
+Access the app at **http://localhost:5173** during development.
+
+### Production build
+
+```bash
+cd frontend && npm run build
+```
+
+This outputs the compiled React app to `static/`, which FastAPI serves directly at http://localhost:8000.
+
+## Tech Stack
+
+- **Backend**: FastAPI, faster-whisper, WebSockets
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS
+- **AI**: Whisper (local transcription), Ollama (local summarization)
 
 ## AI Summarization
 
@@ -58,16 +81,9 @@ After transcribing, click **"Summarize with AI"** — the summary is generated e
 
 ### Option 2: Copy prompt for external AI
 
-Click **"Copy summary prompt"** to copy a pre-built prompt with your transcript to the clipboard. Paste it into any AI assistant:
-- Microsoft 365 Copilot
-- ChatGPT
-- Claude
-- Gemini
-- Or any other LLM chat
+Click **"Copy prompt"** to copy a pre-built prompt with your transcript to the clipboard. Paste it into any AI assistant (Copilot, ChatGPT, Claude, Gemini, etc.).
 
 Use **"Preview prompt"** to see the full prompt inline before copying.
-
-The prompt asks for key decisions, action items, open questions, and a brief summary.
 
 ## Language Selection
 
@@ -110,7 +126,7 @@ This lets you hear audio through your speakers/headphones **and** route it to He
 
 ### 4. Select BlackHole in Hearnote
 
-1. Start Hearnote and open http://localhost:8000
+1. Start Hearnote and open the app
 2. Click the audio source dropdown and select **BlackHole 2ch**
 3. Start your meeting or play audio — Hearnote will now capture the system audio
 
@@ -134,5 +150,6 @@ To go back to normal audio (no routing to Hearnote):
 ## Requirements
 
 - Python 3.10–3.12
+- Node.js 18+ (for frontend build)
 - macOS (Intel or Apple Silicon)
 - Ollama (optional, for local AI summaries)

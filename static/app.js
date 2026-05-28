@@ -190,15 +190,32 @@ function stopRecording() {
 // --- Upload MP4 ---
 const fileInput = document.getElementById('file-input');
 const btnUpload = document.getElementById('btn-upload');
+const btnCancelUpload = document.getElementById('btn-cancel-upload');
 const uploadStatus = document.getElementById('upload-status');
 const uploadTranscript = document.getElementById('upload-transcript');
 const btnSummarizeUpload = document.getElementById('btn-summarize-upload');
 const btnCopilotUpload = document.getElementById('btn-copilot-upload');
 const uploadActions = document.getElementById('upload-actions');
 const uploadSummary = document.getElementById('upload-summary');
+const uploadProgressContainer = document.getElementById('upload-progress-container');
+const uploadProgressBar = document.getElementById('upload-progress-bar');
+const uploadProgressText = document.getElementById('upload-progress-text');
+const uploadTimer = document.getElementById('upload-timer');
+
+let currentJobId = null;
+let uploadTimerInterval = null;
+let uploadStartTime = null;
 
 fileInput.addEventListener('change', () => {
     btnUpload.disabled = !fileInput.files.length;
+});
+
+btnCancelUpload.addEventListener('click', async () => {
+    if (currentJobId) {
+        try {
+            await fetch(`/api/transcribe/cancel/${currentJobId}`, { method: 'POST' });
+        } catch {}
+    }
 });
 
 btnUpload.addEventListener('click', async () => {
@@ -206,17 +223,38 @@ btnUpload.addEventListener('click', async () => {
     if (!file) return;
 
     btnUpload.disabled = true;
+    btnCancelUpload.style.display = 'inline-block';
     uploadTranscript.innerHTML = '';
     uploadActions.style.display = 'none';
     uploadSummary.style.display = 'none';
-    uploadStatus.textContent = `Processing "${file.name}"... This may take a few minutes.`;
+    const previewEl = document.getElementById('upload-preview');
+    if (previewEl) previewEl.style.display = 'none';
+    uploadStatus.textContent = `Processing "${file.name}"...`;
     uploadStatus.className = 'status processing';
+    uploadProgressContainer.style.display = 'flex';
+    uploadProgressBar.style.width = '0%';
+    uploadProgressText.textContent = '';
+    uploadTimer.textContent = '0s';
+    currentJobId = null;
+    uploadStartTime = Date.now();
+    uploadTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - uploadStartTime) / 1000);
+        if (elapsed < 60) {
+            uploadTimer.textContent = `${elapsed}s`;
+        } else {
+            const m = Math.floor(elapsed / 60);
+            const s = elapsed % 60;
+            uploadTimer.textContent = `${m}m ${s}s`;
+        }
+    }, 1000);
 
     const formData = new FormData();
     formData.append('file', file);
 
+    let cancelled = false;
+
     try {
-        const response = await fetch('/api/transcribe', {
+        const response = await fetch('/api/transcribe/stream', {
             method: 'POST',
             body: formData,
         });
@@ -225,31 +263,89 @@ btnUpload.addEventListener('click', async () => {
             throw new Error(`Server error: ${response.status}`);
         }
 
-        const data = await response.json();
-        uploadTranscript.innerHTML = '';
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let segmentCount = 0;
+        let duration = null;
 
-        data.segments.forEach(seg => {
-            const div = document.createElement('div');
-            div.className = 'segment';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-            const ts = document.createElement('span');
-            ts.className = 'timestamp';
-            ts.textContent = formatTime(seg.start);
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
 
-            const text = document.createTextNode(seg.text);
-            div.appendChild(ts);
-            div.appendChild(text);
-            uploadTranscript.appendChild(div);
-        });
+            for (const line of lines) {
+                if (line.startsWith('event: job')) {
+                    // next data line has jobId
+                } else if (line.startsWith('event: cancelled')) {
+                    cancelled = true;
+                } else if (line.startsWith('data: ')) {
+                    const payload = line.slice(6);
+                    try {
+                        const data = JSON.parse(payload);
+                        if (data.jobId) {
+                            currentJobId = data.jobId;
+                        } else if (data.text) {
+                            segmentCount++;
+                            if (!duration && data.duration) duration = data.duration;
 
-        uploadStatus.textContent = `Done — ${data.segments.length} segments transcribed.`;
-        uploadStatus.className = 'status done';
-        uploadActions.style.display = 'flex';
+                            const div = document.createElement('div');
+                            div.className = 'segment';
+                            const ts = document.createElement('span');
+                            ts.className = 'timestamp';
+                            ts.textContent = formatTime(data.start);
+                            div.appendChild(ts);
+                            div.appendChild(document.createTextNode(data.text));
+                            uploadTranscript.appendChild(div);
+                            uploadTranscript.scrollTop = uploadTranscript.scrollHeight;
+
+                            // Update progress
+                            if (duration && data.end) {
+                                const pct = Math.min(100, Math.round((data.end / duration) * 100));
+                                uploadProgressBar.style.width = `${pct}%`;
+                                uploadProgressText.textContent = `${formatTime(data.end)} / ${formatTime(duration)} (${pct}%)`;
+                            }
+                            uploadStatus.textContent = `Processing "${file.name}"... ${segmentCount} segments`;
+
+                            // Show action buttons as soon as first segment arrives
+                            if (segmentCount === 1) {
+                                uploadActions.style.display = 'flex';
+                            }
+                        }
+                    } catch {}
+                }
+            }
+        }
+
+        if (cancelled) {
+            uploadStatus.textContent = `Cancelled — ${segmentCount} segments transcribed before stopping.`;
+            uploadStatus.className = 'status recording';
+            uploadProgressBar.style.width = '100%';
+            uploadProgressBar.classList.add('cancelled');
+        } else {
+            uploadStatus.textContent = `Done — ${segmentCount} segments transcribed.`;
+            uploadStatus.className = 'status done';
+            uploadProgressBar.style.width = '100%';
+            if (segmentCount > 0) uploadActions.style.display = 'flex';
+        }
     } catch (err) {
         uploadStatus.textContent = `Error: ${err.message}`;
         uploadStatus.className = 'status recording';
     } finally {
         btnUpload.disabled = false;
+        btnCancelUpload.style.display = 'none';
+        currentJobId = null;
+        if (uploadTimerInterval) {
+            clearInterval(uploadTimerInterval);
+            uploadTimerInterval = null;
+        }
+        setTimeout(() => {
+            uploadProgressContainer.style.display = 'none';
+            uploadProgressBar.classList.remove('cancelled');
+        }, 3000);
     }
 });
 
@@ -270,21 +366,9 @@ btnSummarizeUpload.addEventListener('click', () => {
     summarize(text, btnSummarizeUpload, uploadSummary);
 });
 
-// --- Copy for Copilot ---
-btnCopilotLive.addEventListener('click', () => {
-    const text = liveTranscript.innerText.trim();
-    copyForCopilot(text, btnCopilotLive);
-});
-
-btnCopilotUpload.addEventListener('click', () => {
-    const text = uploadTranscript.innerText.trim();
-    copyForCopilot(text, btnCopilotUpload);
-});
-
-function copyForCopilot(transcript, button) {
-    if (!transcript) return;
-
-    const prompt = `Summarize this meeting transcript. Please extract and format clearly:
+// --- Prompt Builder ---
+function buildSummaryPrompt(transcript) {
+    return `Summarize this meeting transcript. Please extract and format clearly:
 
 ## Key Decisions
 - List each decision made during the meeting
@@ -303,7 +387,22 @@ Be concise and professional.
 ---
 TRANSCRIPT:
 ${transcript}`;
+}
 
+// --- Copy for AI chat ---
+btnCopilotLive.addEventListener('click', () => {
+    const text = liveTranscript.innerText.trim();
+    copyForCopilot(text, btnCopilotLive);
+});
+
+btnCopilotUpload.addEventListener('click', () => {
+    const text = uploadTranscript.innerText.trim();
+    copyForCopilot(text, btnCopilotUpload);
+});
+
+function copyForCopilot(transcript, button) {
+    if (!transcript) return;
+    const prompt = buildSummaryPrompt(transcript);
     navigator.clipboard.writeText(prompt).then(() => {
         const original = button.textContent;
         button.textContent = 'Copied! Paste into any AI chat';
@@ -314,6 +413,46 @@ ${transcript}`;
         }, 3000);
     });
 }
+
+// --- Preview Prompt ---
+document.getElementById('btn-preview-live').addEventListener('click', () => {
+    togglePreview('live', liveTranscript.innerText.trim());
+});
+
+document.getElementById('btn-preview-upload').addEventListener('click', () => {
+    togglePreview('upload', uploadTranscript.innerText.trim());
+});
+
+document.getElementById('btn-preview-history').addEventListener('click', () => {
+    togglePreview('history', historyTranscript.innerText.trim());
+});
+
+function togglePreview(target, transcript) {
+    const preview = document.getElementById(`${target}-preview`);
+    const previewText = document.getElementById(`${target}-preview-text`);
+    const btn = document.getElementById(`btn-preview-${target}`);
+
+    if (preview.style.display === 'none') {
+        previewText.textContent = buildSummaryPrompt(transcript);
+        preview.style.display = 'block';
+        btn.textContent = 'Hide prompt';
+    } else {
+        preview.style.display = 'none';
+        btn.textContent = 'Preview prompt';
+    }
+}
+
+document.querySelectorAll('.btn-copy-preview').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const target = btn.dataset.target;
+        const text = document.getElementById(`${target}-preview-text`).textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            const original = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = original; }, 2000);
+        });
+    });
+});
 
 async function summarize(text, button, summaryBox) {
     if (!text) return;
@@ -388,10 +527,28 @@ const historyDetail = document.getElementById('history-detail');
 const historyMeta = document.getElementById('history-meta');
 const historyTranscript = document.getElementById('history-transcript');
 const btnBackHistory = document.getElementById('btn-back-history');
+const btnSummarizeHistory = document.getElementById('btn-summarize-history');
+const btnCopilotHistory = document.getElementById('btn-copilot-history');
+const historySummary = document.getElementById('history-summary');
 
 btnBackHistory.addEventListener('click', () => {
     historyDetail.style.display = 'none';
     historyList.style.display = 'block';
+    historySummary.style.display = 'none';
+});
+
+btnSummarizeHistory.addEventListener('click', () => {
+    const text = historyTranscript.innerText.trim();
+    summarize(text, btnSummarizeHistory, historySummary);
+});
+
+btnCopilotHistory.addEventListener('click', () => {
+    const text = historyTranscript.innerText.trim();
+    copyForCopilot(text, btnCopilotHistory);
+});
+
+document.getElementById('copy-history').addEventListener('click', (e) => {
+    copyTranscript(historyTranscript, e.currentTarget);
 });
 
 async function loadHistory() {

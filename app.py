@@ -2,18 +2,20 @@ import json
 import os
 import uuid
 import asyncio
+import multiprocessing
 from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from transcriber import (
     transcribe_audio_chunk,
     transcribe_file,
+    transcribe_file_stream,
     set_live_model,
     get_live_model_size,
 )
@@ -140,6 +142,100 @@ async def upload_transcribe(file: UploadFile = File(...)):
         file_path.unlink(missing_ok=True)
 
 
+# --- Streaming File Transcription ---
+
+
+def _transcribe_worker(file_path: str, pipe_conn):
+    """Runs in a separate process so it can be killed immediately."""
+    from transcriber import transcribe_file_stream
+    try:
+        for seg in transcribe_file_stream(file_path):
+            pipe_conn.send(seg)
+        pipe_conn.send(None)
+    except Exception as e:
+        pipe_conn.send({"_error": str(e)})
+    finally:
+        pipe_conn.close()
+
+
+_active_jobs: dict[str, multiprocessing.Process] = {}
+
+
+@app.post("/api/transcribe/stream")
+async def upload_transcribe_stream(file: UploadFile = File(...)):
+    file_id = str(uuid.uuid4())
+    ext = Path(file.filename).suffix or ".mp4"
+    file_path = UPLOAD_DIR / f"{file_id}{ext}"
+
+    with open(file_path, "wb") as f:
+        while chunk := await file.read(1024 * 1024):
+            f.write(chunk)
+
+    filename = file.filename
+
+    async def event_stream():
+        segments = []
+        parent_conn, child_conn = multiprocessing.Pipe(duplex=False)
+
+        proc = multiprocessing.Process(
+            target=_transcribe_worker,
+            args=(str(file_path), child_conn),
+            daemon=True,
+        )
+        _active_jobs[file_id] = proc
+        proc.start()
+        child_conn.close()
+
+        yield f"event: job\ndata: {json.dumps({'jobId': file_id})}\n\n"
+
+        cancelled = False
+        try:
+            while True:
+                item = await asyncio.to_thread(parent_conn.recv)
+                if item is None:
+                    break
+                if isinstance(item, dict) and "_error" in item:
+                    yield f"event: error\ndata: {json.dumps({'error': item['_error']})}\n\n"
+                    return
+                segments.append(item)
+                yield f"data: {json.dumps(item)}\n\n"
+        except EOFError:
+            if proc.exitcode is None or proc.exitcode < 0:
+                cancelled = True
+
+        proc.join(timeout=2)
+        _active_jobs.pop(file_id, None)
+        file_path.unlink(missing_ok=True)
+
+        if cancelled:
+            yield f"event: cancelled\ndata: {json.dumps({'count': len(segments)})}\n\n"
+            return
+
+        full_text = " ".join(s["text"] for s in segments)
+        save_transcript(
+            source="upload",
+            text=full_text,
+            segments=segments,
+            filename=filename,
+        )
+        yield f"event: done\ndata: {json.dumps({'count': len(segments)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.post("/api/transcribe/cancel/{job_id}")
+async def cancel_transcription(job_id: str):
+    proc = _active_jobs.get(job_id)
+    if proc and proc.is_alive():
+        proc.terminate()
+        proc.join(timeout=3)
+        if proc.is_alive():
+            proc.kill()
+        _active_jobs.pop(job_id, None)
+        return {"ok": True}
+    raise HTTPException(status_code=404, detail="Job not found or already finished")
+
+
 # --- Summarize with Ollama ---
 
 class SummarizeRequest(BaseModel):
@@ -164,7 +260,18 @@ async def summarize(req: SummarizeRequest):
             detail="Ollama is not running. Start it with: ollama serve",
         )
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"Ollama error: {e.response.text}")
+        try:
+            err_body = e.response.json()
+            err_msg = err_body.get("error", "")
+        except Exception:
+            err_msg = e.response.text
+
+        if "not found" in err_msg:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Model '{OLLAMA_MODEL}' not found. Pull it with: ollama pull {OLLAMA_MODEL}",
+            )
+        raise HTTPException(status_code=502, detail=f"Ollama error: {err_msg}")
 
     data = resp.json()
     return {"summary": data.get("response", "")}

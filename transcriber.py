@@ -54,3 +54,16 @@ def transcribe_file(file_path: str) -> list[dict]:
             "text": seg.text.strip(),
         })
     return results
+
+
+def transcribe_file_stream(file_path: str):
+    model = get_upload_model()
+    segments, info = model.transcribe(file_path, vad_filter=True)
+    duration = info.duration
+    for seg in segments:
+        yield {
+            "start": round(seg.start, 1),
+            "end": round(seg.end, 1),
+            "text": seg.text.strip(),
+            "duration": round(duration, 1) if duration else None,
+        }

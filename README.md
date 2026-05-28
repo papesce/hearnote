@@ -8,6 +8,10 @@ Hearnote is a local-first transcription app powered by Whisper. Record live or u
 
 - **Live Recording** — transcribe in real-time from your microphone or system audio (BlackHole)
 - **Upload MP4** — drop in a video/audio file and get a timestamped transcript
+- **AI Summaries** — summarize transcripts locally with Ollama (llama3) or copy a prompt to paste into any AI chat (Copilot, ChatGPT, Claude, etc.)
+- **Transcript History** — all sessions saved locally, searchable and deletable
+- **Model Selector** — choose between Fast (base), Balanced (small), or Accurate (medium) for live transcription
+- **Auto Language Detection** — no need to specify a language; Whisper detects it automatically
 - **Copy to clipboard** — one-click copy of your transcript
 
 ## Quick Start
@@ -18,6 +22,47 @@ uv run python app.py
 ```
 
 Open http://localhost:8000
+
+## Development
+
+For auto-reload on file changes (both Python and static files):
+
+```bash
+./dev.sh          # start dev server
+./dev.sh --open   # start and open browser automatically
+./dev.sh -o       # same, short form
+```
+
+This starts the server with:
+- Auto-restart on Python file changes (uvicorn `--reload`)
+- Auto browser refresh on HTML/CSS/JS changes (live-reload script injected in dev mode)
+
+## AI Summarization
+
+Hearnote offers two ways to summarize transcripts:
+
+### Option 1: Local with Ollama (fully private)
+
+No data leaves your machine. Requires Ollama running locally:
+
+```bash
+brew install ollama
+ollama serve
+ollama pull llama3
+```
+
+After transcribing, click **"Summarize with AI"** — the summary is generated entirely on your machine.
+
+### Option 2: Copy prompt for external AI
+
+Click **"Copy summary prompt"** to copy a pre-built prompt with your transcript to the clipboard. Paste it into any AI assistant:
+- Microsoft 365 Copilot
+- ChatGPT
+- Claude
+- Gemini
+- Or any other LLM chat
+
+The prompt asks for key decisions, action items, open questions, and a brief summary.
 
 ## System Audio Capture (Teams/Zoom)
 
@@ -54,7 +99,7 @@ This lets you hear audio through your speakers/headphones **and** route it to He
 
 ### 4. Select BlackHole in Hearnote
 
-1. Start Hearnote (`uv run python app.py`) and open http://localhost:8000
+1. Start Hearnote and open http://localhost:8000
 2. Click the audio source dropdown and select **BlackHole 2ch**
 3. Start your meeting or play audio — Hearnote will now capture the system audio
 
@@ -79,3 +124,4 @@ To go back to normal audio (no routing to Hearnote):
 
 - Python 3.10–3.12
 - macOS (Intel or Apple Silicon)
+- Ollama (optional, for local AI summaries)

@@ -61,6 +61,14 @@
             <div class="action-buttons" id="live-actions" style="display:none;">
                 <button id="btn-summarize-live" class="btn btn-secondary">Summarize with AI</button>
                 <button id="btn-copilot-live" class="btn btn-copilot">Copy summary prompt</button>
+                <button id="btn-preview-live" class="btn btn-outline">Preview prompt</button>
+            </div>
+            <div class="prompt-preview" id="live-preview" style="display:none;">
+                <div class="prompt-preview-header">
+                    <span>Prompt Preview</span>
+                    <button class="btn-copy-preview" data-target="live">Copy</button>
+                </div>
+                <pre class="prompt-preview-text" id="live-preview-text"></pre>
             </div>
             <div class="summary-box" id="live-summary" style="display:none;"></div>
         </div>
@@ -70,10 +78,20 @@
             <div class="controls">
                 <label for="file-input">Select MP4 file:</label>
                 <input type="file" id="file-input" accept="video/mp4,audio/*,.mp4,.wav,.m4a,.webm">
-                <button id="btn-upload" class="btn btn-primary" disabled>Transcribe</button>
+                <div class="button-group">
+                    <button id="btn-upload" class="btn btn-primary" disabled>Transcribe</button>
+                    <button id="btn-cancel-upload" class="btn btn-danger" style="display:none;">Cancel</button>
+                </div>
             </div>
 
             <div class="status" id="upload-status"></div>
+            <div class="progress-bar-container" id="upload-progress-container" style="display:none;">
+                <div class="progress-bar-track">
+                    <div class="progress-bar" id="upload-progress-bar"></div>
+                </div>
+                <span class="progress-text" id="upload-progress-text"></span>
+                <span class="progress-timer" id="upload-timer">0s</span>
+            </div>
             <div class="transcript-wrapper">
                 <button class="btn-copy" id="copy-upload" title="Copy transcript">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -86,6 +104,14 @@
             <div class="action-buttons" id="upload-actions" style="display:none;">
                 <button id="btn-summarize-upload" class="btn btn-secondary">Summarize with AI</button>
                 <button id="btn-copilot-upload" class="btn btn-copilot">Copy summary prompt</button>
+                <button id="btn-preview-upload" class="btn btn-outline">Preview prompt</button>
+            </div>
+            <div class="prompt-preview" id="upload-preview" style="display:none;">
+                <div class="prompt-preview-header">
+                    <span>Prompt Preview</span>
+                    <button class="btn-copy-preview" data-target="upload">Copy</button>
+                </div>
+                <pre class="prompt-preview-text" id="upload-preview-text"></pre>
             </div>
             <div class="summary-box" id="upload-summary" style="display:none;"></div>
         </div>
@@ -98,7 +124,26 @@
             <div id="history-detail" class="history-detail" style="display:none;">
                 <button id="btn-back-history" class="btn btn-secondary btn-small">Back to list</button>
                 <div class="history-meta" id="history-meta"></div>
-                <div class="transcript-box" id="history-transcript"></div>
+                <div class="transcript-wrapper">
+                    <button class="btn-copy" id="copy-history" title="Copy transcript">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        <span>Copy</span>
+                    </button>
+                    <div class="transcript-box" id="history-transcript"></div>
+                </div>
+                <div class="action-buttons" id="history-actions">
+                    <button id="btn-summarize-history" class="btn btn-secondary">Summarize with AI</button>
+                    <button id="btn-copilot-history" class="btn btn-copilot">Copy summary prompt</button>
+                    <button id="btn-preview-history" class="btn btn-outline">Preview prompt</button>
+                </div>
+                <div class="prompt-preview" id="history-preview" style="display:none;">
+                    <div class="prompt-preview-header">
+                        <span>Prompt Preview</span>
+                        <button class="btn-copy-preview" data-target="history">Copy</button>
+                    </div>
+                    <pre class="prompt-preview-text" id="history-preview-text"></pre>
+                </div>
+                <div class="summary-box" id="history-summary" style="display:none;"></div>
             </div>
         </div>
     </div>

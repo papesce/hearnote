@@ -18,15 +18,28 @@
         <div class="tabs">
             <button class="tab active" data-tab="live">Live Recording</button>
             <button class="tab" data-tab="upload">Upload MP4</button>
+            <button class="tab" data-tab="history">History</button>
         </div>
 
         <!-- Live Recording Tab -->
         <div class="tab-content active" id="tab-live">
             <div class="controls">
-                <label for="audio-source">Audio Source:</label>
-                <select id="audio-source">
-                    <option value="default">Default Microphone</option>
-                </select>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <label for="audio-source">Audio Source:</label>
+                        <select id="audio-source">
+                            <option value="default">Default Microphone</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="model-select">Model:</label>
+                        <select id="model-select">
+                            <option value="base">Fast (base)</option>
+                            <option value="small">Balanced (small)</option>
+                            <option value="medium">Accurate (medium)</option>
+                        </select>
+                    </div>
+                </div>
                 <p class="hint">To capture system audio (e.g. Teams), set BlackHole as your input device in System Settings → Sound → Input, then select it here.</p>
 
                 <div class="button-group">
@@ -45,6 +58,11 @@
                     <p class="placeholder">Transcript will appear here...</p>
                 </div>
             </div>
+            <div class="action-buttons" id="live-actions" style="display:none;">
+                <button id="btn-summarize-live" class="btn btn-secondary">Summarize with AI</button>
+                <button id="btn-copilot-live" class="btn btn-copilot">Copy summary prompt</button>
+            </div>
+            <div class="summary-box" id="live-summary" style="display:none;"></div>
         </div>
 
         <!-- Upload Tab -->
@@ -64,6 +82,23 @@
                 <div class="transcript-box" id="upload-transcript">
                     <p class="placeholder">Upload a file to see the transcript...</p>
                 </div>
+            </div>
+            <div class="action-buttons" id="upload-actions" style="display:none;">
+                <button id="btn-summarize-upload" class="btn btn-secondary">Summarize with AI</button>
+                <button id="btn-copilot-upload" class="btn btn-copilot">Copy summary prompt</button>
+            </div>
+            <div class="summary-box" id="upload-summary" style="display:none;"></div>
+        </div>
+
+        <!-- History Tab -->
+        <div class="tab-content" id="tab-history">
+            <div id="history-list" class="history-list">
+                <p class="placeholder">Loading...</p>
+            </div>
+            <div id="history-detail" class="history-detail" style="display:none;">
+                <button id="btn-back-history" class="btn btn-secondary btn-small">Back to list</button>
+                <div class="history-meta" id="history-meta"></div>
+                <div class="transcript-box" id="history-transcript"></div>
             </div>
         </div>
     </div>

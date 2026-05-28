@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import uuid
 import asyncio
 import multiprocessing
@@ -30,10 +31,14 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 TRANSCRIPTS_DIR = Path("transcripts")
 TRANSCRIPTS_DIR.mkdir(exist_ok=True)
 
+RECORDINGS_DIR = Path("recordings")
+RECORDINGS_DIR.mkdir(exist_ok=True)
+
 STATIC_DIR = Path("static")
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 _server_start_id = str(uuid.uuid4())
+
+_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
 
 @app.get("/api/livereload")
@@ -86,13 +91,24 @@ LIVERELOAD_SCRIPT = """
 """
 
 
+@app.get("/favicon.svg")
+async def favicon():
+    favicon_path = STATIC_DIR / "favicon.svg"
+    if favicon_path.exists():
+        return FileResponse(favicon_path, media_type="image/svg+xml")
+    raise HTTPException(status_code=404)
+
+
 @app.get("/")
 async def index():
+    index_path = STATIC_DIR / "index.html"
+    if not index_path.exists():
+        return HTMLResponse("<h1>Frontend not built</h1><p>Run: cd frontend && npm run build</p>")
     if DEV_MODE:
-        html = STATIC_DIR.joinpath("index.html").read_text()
+        html = index_path.read_text()
         html = html.replace("</body>", LIVERELOAD_SCRIPT + "</body>")
         return HTMLResponse(html)
-    return FileResponse("static/index.html")
+    return FileResponse(index_path)
 
 
 # --- Live Transcription ---
@@ -100,18 +116,48 @@ async def index():
 @app.websocket("/ws/transcribe")
 async def websocket_transcribe(websocket: WebSocket):
     await websocket.accept()
+    lang = websocket.query_params.get("lang") or None
     chunks: list[str] = []
+    saved = False
     try:
         while True:
-            data = await websocket.receive_bytes()
-            text = await asyncio.to_thread(transcribe_audio_chunk, data)
-            if text.strip():
-                chunks.append(text.strip())
-                await websocket.send_json({"text": text})
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            if "bytes" in message:
+                data = message["bytes"]
+                text = await asyncio.to_thread(transcribe_audio_chunk, data, lang)
+                if text.strip():
+                    chunks.append(text.strip())
+                    await websocket.send_json({"text": text})
+            elif "text" in message:
+                text_data = message["text"]
+                client_id = None
+                client_full_text = None
+                is_stop = False
+                if text_data == "stop":
+                    is_stop = True
+                else:
+                    try:
+                        payload = json.loads(text_data)
+                        if payload.get("action") == "stop":
+                            is_stop = True
+                            client_id = payload.get("transcriptId")
+                            client_full_text = payload.get("fullText")
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+                if is_stop:
+                    transcript_id = None
+                    # Prefer client-provided fullText (fixes sync bug where
+                    # server chunks may be incomplete if audio was still processing)
+                    full_text = client_full_text or (" ".join(chunks) if chunks else None)
+                    if full_text and full_text.strip():
+                        transcript_id = save_transcript(source="live", text=full_text.strip(), transcript_id=client_id)
+                        saved = True
+                    await websocket.send_json({"event": "stopped", "transcriptId": transcript_id})
+                    break
     except WebSocketDisconnect:
-        pass
-    finally:
-        if chunks:
+        if chunks and not saved:
             full_text = " ".join(chunks)
             save_transcript(source="live", text=full_text)
 
@@ -145,11 +191,11 @@ async def upload_transcribe(file: UploadFile = File(...)):
 # --- Streaming File Transcription ---
 
 
-def _transcribe_worker(file_path: str, pipe_conn):
+def _transcribe_worker(file_path: str, language: str | None, pipe_conn):
     """Runs in a separate process so it can be killed immediately."""
     from transcriber import transcribe_file_stream
     try:
-        for seg in transcribe_file_stream(file_path):
+        for seg in transcribe_file_stream(file_path, language=language):
             pipe_conn.send(seg)
         pipe_conn.send(None)
     except Exception as e:
@@ -162,7 +208,7 @@ _active_jobs: dict[str, multiprocessing.Process] = {}
 
 
 @app.post("/api/transcribe/stream")
-async def upload_transcribe_stream(file: UploadFile = File(...)):
+async def upload_transcribe_stream(file: UploadFile = File(...), lang: str | None = None):
     file_id = str(uuid.uuid4())
     ext = Path(file.filename).suffix or ".mp4"
     file_path = UPLOAD_DIR / f"{file_id}{ext}"
@@ -172,6 +218,7 @@ async def upload_transcribe_stream(file: UploadFile = File(...)):
             f.write(chunk)
 
     filename = file.filename
+    language = lang or None
 
     async def event_stream():
         segments = []
@@ -179,7 +226,7 @@ async def upload_transcribe_stream(file: UploadFile = File(...)):
 
         proc = multiprocessing.Process(
             target=_transcribe_worker,
-            args=(str(file_path), child_conn),
+            args=(str(file_path), language, child_conn),
             daemon=True,
         )
         _active_jobs[file_id] = proc
@@ -205,22 +252,81 @@ async def upload_transcribe_stream(file: UploadFile = File(...)):
 
         proc.join(timeout=2)
         _active_jobs.pop(file_id, None)
-        file_path.unlink(missing_ok=True)
 
         if cancelled:
+            file_path.unlink(missing_ok=True)
             yield f"event: cancelled\ndata: {json.dumps({'count': len(segments)})}\n\n"
             return
 
         full_text = " ".join(s["text"] for s in segments)
-        save_transcript(
+        transcript_id = save_transcript(
             source="upload",
             text=full_text,
             segments=segments,
             filename=filename,
         )
-        yield f"event: done\ndata: {json.dumps({'count': len(segments)})}\n\n"
+
+        # Move uploaded file to recordings for playback
+        recording_path = RECORDINGS_DIR / f"{transcript_id}{ext}"
+        file_path.rename(recording_path)
+
+        # Mark transcript as having a recording
+        transcript_path = TRANSCRIPTS_DIR / f"{transcript_id}.json"
+        if transcript_path.exists():
+            data = json.loads(transcript_path.read_text())
+            data["has_recording"] = True
+            data["recording_ext"] = ext
+            transcript_path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+
+        yield f"event: done\ndata: {json.dumps({'count': len(segments), 'transcriptId': transcript_id})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+class RetranscribeRequest(BaseModel):
+    transcript_id: str
+    lang: str | None = None
+
+
+@app.post("/api/transcribe/retranscribe")
+async def retranscribe(req: RetranscribeRequest):
+    # Find the recording file
+    recording_path = None
+    for path in RECORDINGS_DIR.glob(f"{req.transcript_id}.*"):
+        recording_path = path
+        break
+
+    if not recording_path:
+        raise HTTPException(status_code=404, detail="No recording found for this transcript")
+
+    # Load original transcript for metadata
+    orig_path = TRANSCRIPTS_DIR / f"{req.transcript_id}.json"
+    orig_data = {}
+    if orig_path.exists():
+        orig_data = json.loads(orig_path.read_text())
+
+    # Transcribe with the upload (medium) model
+    segments = await asyncio.to_thread(
+        transcribe_file, str(recording_path), req.lang
+    )
+    full_text = " ".join(seg["text"] for seg in segments)
+
+    # Save as a new transcript, referencing the same recording
+    new_id = save_transcript(
+        source="retranscribe",
+        text=full_text,
+        segments=segments,
+        filename=orig_data.get("filename"),
+    )
+
+    # Link the new transcript to the same recording
+    new_transcript_path = TRANSCRIPTS_DIR / f"{new_id}.json"
+    new_data = json.loads(new_transcript_path.read_text())
+    new_data["has_recording"] = True
+    new_data["recording_ref"] = req.transcript_id
+    new_transcript_path.write_text(json.dumps(new_data, ensure_ascii=False, indent=2))
+
+    return {"transcriptId": new_id, "segments": segments}
 
 
 @app.post("/api/transcribe/cancel/{job_id}")
@@ -284,8 +390,10 @@ def save_transcript(
     text: str,
     segments: list[dict] | None = None,
     filename: str | None = None,
-):
-    transcript_id = str(uuid.uuid4())
+    transcript_id: str | None = None,
+) -> str:
+    if not transcript_id or not _UUID_RE.match(transcript_id):
+        transcript_id = str(uuid.uuid4())
     record = {
         "id": transcript_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -293,9 +401,11 @@ def save_transcript(
         "text": text,
         "segments": segments,
         "filename": filename,
+        "has_recording": False,
     }
     path = TRANSCRIPTS_DIR / f"{transcript_id}.json"
     path.write_text(json.dumps(record, ensure_ascii=False, indent=2))
+    return transcript_id
 
 
 @app.get("/api/transcripts")
@@ -310,6 +420,7 @@ async def list_transcripts():
                 "source": data["source"],
                 "filename": data.get("filename"),
                 "preview": data["text"][:120],
+                "has_recording": data.get("has_recording", False) or bool(data.get("recording_ref")),
             })
         except (json.JSONDecodeError, KeyError):
             continue
@@ -330,7 +441,75 @@ async def delete_transcript(transcript_id: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="Transcript not found")
     path.unlink()
+    for rec_path in RECORDINGS_DIR.glob(f"{transcript_id}.*"):
+        rec_path.unlink(missing_ok=True)
     return {"ok": True}
+
+
+# --- Recordings ---
+
+@app.post("/api/recordings/{transcript_id}")
+async def upload_recording(transcript_id: str, file: UploadFile = File(...)):
+    if not _UUID_RE.match(transcript_id):
+        raise HTTPException(status_code=400, detail="Invalid transcript ID")
+
+    recording_path = RECORDINGS_DIR / f"{transcript_id}.webm"
+    with open(recording_path, "wb") as f:
+        while chunk := await file.read(1024 * 1024):
+            f.write(chunk)
+
+    transcript_path = TRANSCRIPTS_DIR / f"{transcript_id}.json"
+    if transcript_path.exists():
+        data = json.loads(transcript_path.read_text())
+        data["has_recording"] = True
+        transcript_path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        record = {
+            "id": transcript_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "source": "live",
+            "text": "(Recording saved without transcript)",
+            "segments": None,
+            "filename": None,
+            "has_recording": True,
+        }
+        transcript_path.write_text(json.dumps(record, ensure_ascii=False, indent=2))
+
+    return {"ok": True}
+
+
+@app.get("/api/recordings/{transcript_id}")
+async def get_recording(transcript_id: str):
+    # Check for recording with any extension
+    for path in RECORDINGS_DIR.glob(f"{transcript_id}.*"):
+        media_types = {
+            ".webm": "audio/webm",
+            ".mp4": "video/mp4",
+            ".m4a": "audio/mp4",
+            ".wav": "audio/wav",
+            ".mp3": "audio/mpeg",
+        }
+        media_type = media_types.get(path.suffix, "application/octet-stream")
+        return FileResponse(path, media_type=media_type, filename=f"{transcript_id}{path.suffix}")
+
+    # Check if this transcript references another's recording
+    transcript_path = TRANSCRIPTS_DIR / f"{transcript_id}.json"
+    if transcript_path.exists():
+        data = json.loads(transcript_path.read_text())
+        ref_id = data.get("recording_ref")
+        if ref_id:
+            for path in RECORDINGS_DIR.glob(f"{ref_id}.*"):
+                media_types = {
+                    ".webm": "audio/webm",
+                    ".mp4": "video/mp4",
+                    ".m4a": "audio/mp4",
+                    ".wav": "audio/wav",
+                    ".mp3": "audio/mpeg",
+                }
+                media_type = media_types.get(path.suffix, "application/octet-stream")
+                return FileResponse(path, media_type=media_type, filename=f"{transcript_id}{path.suffix}")
+
+    raise HTTPException(status_code=404, detail="Recording not found")
 
 
 # --- Model Settings ---
@@ -352,6 +531,11 @@ async def update_model(req: ModelRequest):
         raise HTTPException(status_code=400, detail=str(e))
     return {"size": get_live_model_size()}
 
+
+# Mount static files last so API routes take priority
+_assets_dir = STATIC_DIR / "assets"
+if _assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
 
 if __name__ == "__main__":
     import uvicorn

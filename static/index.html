@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hearnote</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="brand">
+            <img src="/static/logo.svg" alt="Hearnote" class="logo">
+            <h1>Hearnote</h1>
+        </div>
+        <p class="subtitle">Private meeting transcription — nothing leaves your machine.</p>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="live">Live Recording</button>
+            <button class="tab" data-tab="upload">Upload MP4</button>
+        </div>
+
+        <!-- Live Recording Tab -->
+        <div class="tab-content active" id="tab-live">
+            <div class="controls">
+                <label for="audio-source">Audio Source:</label>
+                <select id="audio-source">
+                    <option value="default">Default Microphone</option>
+                </select>
+                <p class="hint">To capture system audio (e.g. Teams), set BlackHole as your input device in System Settings → Sound → Input, then select it here.</p>
+
+                <div class="button-group">
+                    <button id="btn-start" class="btn btn-primary">Start Recording</button>
+                    <button id="btn-stop" class="btn btn-danger" disabled>Stop</button>
+                </div>
+            </div>
+
+            <div class="status" id="live-status"></div>
+            <div class="transcript-wrapper">
+                <button class="btn-copy" id="copy-live" title="Copy transcript">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <span>Copy</span>
+                </button>
+                <div class="transcript-box" id="live-transcript">
+                    <p class="placeholder">Transcript will appear here...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Tab -->
+        <div class="tab-content" id="tab-upload">
+            <div class="controls">
+                <label for="file-input">Select MP4 file:</label>
+                <input type="file" id="file-input" accept="video/mp4,audio/*,.mp4,.wav,.m4a,.webm">
+                <button id="btn-upload" class="btn btn-primary" disabled>Transcribe</button>
+            </div>
+
+            <div class="status" id="upload-status"></div>
+            <div class="transcript-wrapper">
+                <button class="btn-copy" id="copy-upload" title="Copy transcript">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <span>Copy</span>
+                </button>
+                <div class="transcript-box" id="upload-transcript">
+                    <p class="placeholder">Upload a file to see the transcript...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

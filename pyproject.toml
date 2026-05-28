@@ -1,0 +1,14 @@
+[project]
+name = "hearnote"
+version = "0.1.0"
+description = "Private meeting transcription — nothing leaves your machine"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
+    "websockets>=12.0",
+    "numpy>=1.24.0",
+    "onnxruntime<=1.19.2",
+]

@@ -34,12 +34,15 @@ def get_upload_model() -> WhisperModel:
     return _upload_model
 
 
-def transcribe_audio_chunk(audio_bytes: bytes) -> str:
+def transcribe_audio_chunk(audio_bytes: bytes, language: str | None = None) -> str:
     audio = np.frombuffer(audio_bytes, dtype=np.float32)
     if len(audio) == 0:
         return ""
     model = get_live_model()
-    segments, _ = model.transcribe(audio, vad_filter=True)
+    kwargs = {"vad_filter": True}
+    if language:
+        kwargs["language"] = language
+    segments, _ = model.transcribe(audio, **kwargs)
     return " ".join(seg.text.strip() for seg in segments)
 
 
@@ -56,9 +59,12 @@ def transcribe_file(file_path: str) -> list[dict]:
     return results
 
 
-def transcribe_file_stream(file_path: str):
+def transcribe_file_stream(file_path: str, language: str | None = None):
     model = get_upload_model()
-    segments, info = model.transcribe(file_path, vad_filter=True)
+    kwargs = {"vad_filter": True}
+    if language:
+        kwargs["language"] = language
+    segments, info = model.transcribe(file_path, **kwargs)
     duration = info.duration
     for seg in segments:
         yield {

@@ -1,3 +1,20 @@
+// --- Utility ---
+function setActionButtonsEnabled(container, enabled) {
+    container.querySelectorAll('.btn').forEach(btn => {
+        btn.disabled = !enabled;
+    });
+}
+
+function updateWordCount(transcriptEl, countEl) {
+    const text = transcriptEl.innerText.trim();
+    if (!text || transcriptEl.querySelector('.placeholder')) {
+        countEl.textContent = '';
+        return;
+    }
+    const words = text.split(/\s+/).filter(Boolean).length;
+    countEl.textContent = `${words} word${words !== 1 ? 's' : ''}`;
+}
+
 const tabs = document.querySelectorAll('.tab');
 const tabContents = document.querySelectorAll('.tab-content');
 
@@ -123,15 +140,19 @@ async function startRecording() {
     processor.connect(audioContext.destination);
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    websocket = new WebSocket(`${wsProtocol}//${window.location.host}/ws/transcribe`);
+    const lang = document.getElementById('lang-live').value;
+    const langParam = lang ? `?lang=${lang}` : '';
+    websocket = new WebSocket(`${wsProtocol}//${window.location.host}/ws/transcribe${langParam}`);
 
     websocket.onopen = () => {
         isRecording = true;
-        btnStart.disabled = true;
-        btnStop.disabled = false;
+        btnStart.style.display = 'none';
+        btnStop.style.display = 'inline-block';
         liveTranscript.innerHTML = '';
-        liveActions.style.display = 'none';
+        liveTranscript.classList.remove('has-content');
+        setActionButtonsEnabled(liveActions, false);
         liveSummary.style.display = 'none';
+        document.getElementById('live-word-count').textContent = '';
         liveStatus.innerHTML = '<span class="recording-indicator"></span>Recording...';
         liveStatus.className = 'status recording';
     };
@@ -143,6 +164,9 @@ async function startRecording() {
             span.textContent = data.text + ' ';
             liveTranscript.appendChild(span);
             liveTranscript.scrollTop = liveTranscript.scrollHeight;
+            liveTranscript.classList.add('has-content');
+            setActionButtonsEnabled(liveActions, true);
+            updateWordCount(liveTranscript, document.getElementById('live-word-count'));
         }
     };
 
@@ -159,8 +183,8 @@ async function startRecording() {
 
 function stopRecording() {
     isRecording = false;
-    btnStart.disabled = false;
-    btnStop.disabled = true;
+    btnStart.style.display = 'inline-block';
+    btnStop.style.display = 'none';
     liveStatus.textContent = 'Stopped.';
     liveStatus.className = 'status done';
 
@@ -183,7 +207,7 @@ function stopRecording() {
 
     const text = liveTranscript.innerText.trim();
     if (text && !liveTranscript.querySelector('.placeholder')) {
-        liveActions.style.display = 'flex';
+        setActionButtonsEnabled(liveActions, true);
     }
 }
 
@@ -206,8 +230,45 @@ let currentJobId = null;
 let uploadTimerInterval = null;
 let uploadStartTime = null;
 
+// Initialize action buttons as disabled until there's content
+setActionButtonsEnabled(liveActions, false);
+setActionButtonsEnabled(uploadActions, false);
+
+// --- Drag and Drop ---
+const dropZone = document.getElementById('drop-zone');
+const dropZoneFilename = document.getElementById('drop-zone-filename');
+
+dropZone.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragover');
+});
+
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change'));
+    }
+});
+
 fileInput.addEventListener('change', () => {
-    btnUpload.disabled = !fileInput.files.length;
+    const hasFile = fileInput.files.length > 0;
+    btnUpload.disabled = !hasFile;
+    if (hasFile) {
+        dropZoneFilename.textContent = fileInput.files[0].name;
+    } else {
+        dropZoneFilename.textContent = '';
+    }
 });
 
 btnCancelUpload.addEventListener('click', async () => {
@@ -225,8 +286,10 @@ btnUpload.addEventListener('click', async () => {
     btnUpload.disabled = true;
     btnCancelUpload.style.display = 'inline-block';
     uploadTranscript.innerHTML = '';
-    uploadActions.style.display = 'none';
+    uploadTranscript.classList.remove('has-content');
+    setActionButtonsEnabled(uploadActions, false);
     uploadSummary.style.display = 'none';
+    document.getElementById('upload-word-count').textContent = '';
     const previewEl = document.getElementById('upload-preview');
     if (previewEl) previewEl.style.display = 'none';
     uploadStatus.textContent = `Processing "${file.name}"...`;
@@ -254,7 +317,9 @@ btnUpload.addEventListener('click', async () => {
     let cancelled = false;
 
     try {
-        const response = await fetch('/api/transcribe/stream', {
+        const uploadLang = document.getElementById('lang-upload').value;
+        const uploadLangParam = uploadLang ? `?lang=${uploadLang}` : '';
+        const response = await fetch(`/api/transcribe/stream${uploadLangParam}`, {
             method: 'POST',
             body: formData,
         });
@@ -310,10 +375,12 @@ btnUpload.addEventListener('click', async () => {
                             }
                             uploadStatus.textContent = `Processing "${file.name}"... ${segmentCount} segments`;
 
-                            // Show action buttons as soon as first segment arrives
+                            // Enable action buttons as soon as first segment arrives
                             if (segmentCount === 1) {
-                                uploadActions.style.display = 'flex';
+                                uploadTranscript.classList.add('has-content');
+                                setActionButtonsEnabled(uploadActions, true);
                             }
+                            updateWordCount(uploadTranscript, document.getElementById('upload-word-count'));
                         }
                     } catch {}
                 }
@@ -329,7 +396,7 @@ btnUpload.addEventListener('click', async () => {
             uploadStatus.textContent = `Done — ${segmentCount} segments transcribed.`;
             uploadStatus.className = 'status done';
             uploadProgressBar.style.width = '100%';
-            if (segmentCount > 0) uploadActions.style.display = 'flex';
+            if (segmentCount > 0) setActionButtonsEnabled(uploadActions, true);
         }
     } catch (err) {
         uploadStatus.textContent = `Error: ${err.message}`;
@@ -530,6 +597,9 @@ const btnBackHistory = document.getElementById('btn-back-history');
 const btnSummarizeHistory = document.getElementById('btn-summarize-history');
 const btnCopilotHistory = document.getElementById('btn-copilot-history');
 const historySummary = document.getElementById('history-summary');
+const historySearchInput = document.getElementById('history-search');
+
+let allTranscripts = [];
 
 btnBackHistory.addEventListener('click', () => {
     historyDetail.style.display = 'none';
@@ -551,6 +621,10 @@ document.getElementById('copy-history').addEventListener('click', (e) => {
     copyTranscript(historyTranscript, e.currentTarget);
 });
 
+historySearchInput.addEventListener('input', () => {
+    renderHistoryList(historySearchInput.value.trim().toLowerCase());
+});
+
 async function loadHistory() {
     historyList.innerHTML = '<p class="placeholder">Loading...</p>';
     historyDetail.style.display = 'none';
@@ -559,46 +633,67 @@ async function loadHistory() {
     try {
         const resp = await fetch('/api/transcripts');
         const data = await resp.json();
-
-        if (data.transcripts.length === 0) {
-            historyList.innerHTML = '<p class="placeholder">No transcripts yet. Record or upload something first.</p>';
-            return;
-        }
-
-        historyList.innerHTML = '';
-        data.transcripts.forEach(t => {
-            const item = document.createElement('div');
-            item.className = 'history-item';
-
-            const date = new Date(t.timestamp);
-            const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-            const timeStr = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-
-            item.innerHTML = `
-                <div class="history-item-content">
-                    <div class="history-item-header">
-                        <span class="history-source ${t.source}">${t.source}</span>
-                        <span class="history-date">${dateStr} ${timeStr}</span>
-                        ${t.filename ? `<span class="history-filename">${t.filename}</span>` : ''}
-                    </div>
-                    <p class="history-preview">${t.preview}...</p>
-                </div>
-                <button class="btn-delete-history" data-id="${t.id}" title="Delete">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/></svg>
-                </button>
-            `;
-
-            item.querySelector('.history-item-content').addEventListener('click', () => viewTranscript(t.id));
-            item.querySelector('.btn-delete-history').addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteTranscript(t.id);
-            });
-
-            historyList.appendChild(item);
-        });
+        allTranscripts = data.transcripts;
+        renderHistoryList(historySearchInput.value.trim().toLowerCase());
     } catch {
         historyList.innerHTML = '<p class="placeholder">Failed to load history.</p>';
     }
+}
+
+function renderHistoryList(query) {
+    const filtered = query
+        ? allTranscripts.filter(t => t.preview.toLowerCase().includes(query) || (t.filename && t.filename.toLowerCase().includes(query)))
+        : allTranscripts;
+
+    if (allTranscripts.length === 0) {
+        historyList.innerHTML = `
+            <div class="history-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <p>No recordings yet</p>
+                <p class="history-empty-hint">Record live or upload a file to get started</p>
+            </div>`;
+        return;
+    }
+
+    if (filtered.length === 0) {
+        historyList.innerHTML = '<p class="placeholder">No results matching your search.</p>';
+        return;
+    }
+
+    historyList.innerHTML = '';
+    filtered.forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+
+        const date = new Date(t.timestamp);
+        const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+        item.innerHTML = `
+            <div class="history-item-content">
+                <div class="history-item-header">
+                    <span class="history-source ${t.source}">${t.source}</span>
+                    <span class="history-date">${dateStr} ${timeStr}</span>
+                    ${t.filename ? `<span class="history-filename">${t.filename}</span>` : ''}
+                </div>
+                <p class="history-preview">${t.preview}...</p>
+            </div>
+            <button class="btn-delete-history" data-id="${t.id}" title="Delete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/></svg>
+            </button>
+        `;
+
+        item.querySelector('.history-item-content').addEventListener('click', () => viewTranscript(t.id));
+        item.querySelector('.btn-delete-history').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteTranscript(t.id);
+        });
+
+        historyList.appendChild(item);
+    });
 }
 
 async function viewTranscript(id) {

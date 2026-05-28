@@ -7,11 +7,14 @@ Hearnote is a local-first transcription app powered by Whisper. Record live or u
 ## Features
 
 - **Live Recording** — transcribe in real-time from your microphone or system audio (BlackHole)
-- **Upload MP4** — drop in a video/audio file and get a timestamped transcript
+- **Upload MP4** — drop in a video/audio file and get a streaming, timestamped transcript
+- **Streaming transcription** — segments appear one by one as they're processed, with a progress bar and elapsed timer
+- **Cancel** — stop an in-progress upload transcription instantly (kills the process, CPU freed immediately)
 - **AI Summaries** — summarize transcripts locally with Ollama (llama3) or copy a prompt to paste into any AI chat (Copilot, ChatGPT, Claude, etc.)
-- **Transcript History** — all sessions saved locally, searchable and deletable
+- **Preview prompt** — see the full prompt inline before copying
+- **Transcript History** — all sessions saved locally, browsable and deletable
 - **Model Selector** — choose between Fast (base), Balanced (small), or Accurate (medium) for live transcription
-- **Auto Language Detection** — no need to specify a language; Whisper detects it automatically
+- **Language Selector** — pick the language you're listening to, or leave as Auto-detect
 - **Copy to clipboard** — one-click copy of your transcript
 
 ## Quick Start
@@ -62,7 +65,15 @@ Click **"Copy summary prompt"** to copy a pre-built prompt with your transcript 
 - Gemini
 - Or any other LLM chat
 
+Use **"Preview prompt"** to see the full prompt inline before copying.
+
 The prompt asks for key decisions, action items, open questions, and a brief summary.
+
+## Language Selection
+
+Both the Live and Upload tabs have a language dropdown. Choose the language being spoken for faster, more accurate transcription — or leave it on "Auto-detect" to let Whisper figure it out.
+
+Supported languages: English, Spanish, Portuguese, French, German, Italian, Dutch, Japanese, Chinese, Korean, Arabic, Hindi, Russian.
 
 ## System Audio Capture (Teams/Zoom)
 

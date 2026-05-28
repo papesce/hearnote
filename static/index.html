@@ -39,17 +39,37 @@
                             <option value="medium">Accurate (medium)</option>
                         </select>
                     </div>
+                    <div class="control-group">
+                        <label for="lang-live">Language:</label>
+                        <select id="lang-live">
+                            <option value="">Auto-detect</option>
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="it">Italian</option>
+                            <option value="nl">Dutch</option>
+                            <option value="ja">Japanese</option>
+                            <option value="zh">Chinese</option>
+                            <option value="ko">Korean</option>
+                            <option value="ar">Arabic</option>
+                            <option value="hi">Hindi</option>
+                            <option value="ru">Russian</option>
+                        </select>
+                    </div>
                 </div>
                 <p class="hint">To capture system audio (e.g. Teams), set BlackHole as your input device in System Settings → Sound → Input, then select it here.</p>
 
                 <div class="button-group">
                     <button id="btn-start" class="btn btn-primary">Start Recording</button>
-                    <button id="btn-stop" class="btn btn-danger" disabled>Stop</button>
+                    <button id="btn-stop" class="btn btn-danger" style="display:none;">Stop Recording</button>
                 </div>
             </div>
 
             <div class="status" id="live-status"></div>
             <div class="transcript-wrapper">
+                <span class="word-count" id="live-word-count"></span>
                 <button class="btn-copy" id="copy-live" title="Copy transcript">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     <span>Copy</span>
@@ -57,11 +77,11 @@
                 <div class="transcript-box" id="live-transcript">
                     <p class="placeholder">Transcript will appear here...</p>
                 </div>
-            </div>
-            <div class="action-buttons" id="live-actions" style="display:none;">
-                <button id="btn-summarize-live" class="btn btn-secondary">Summarize with AI</button>
-                <button id="btn-copilot-live" class="btn btn-copilot">Copy summary prompt</button>
-                <button id="btn-preview-live" class="btn btn-outline">Preview prompt</button>
+                <div class="action-buttons" id="live-actions">
+                    <button id="btn-summarize-live" class="btn btn-secondary">Summarize with AI</button>
+                    <button id="btn-copilot-live" class="btn btn-copilot">Copy summary prompt</button>
+                    <button id="btn-preview-live" class="btn btn-outline">Preview prompt</button>
+                </div>
             </div>
             <div class="prompt-preview" id="live-preview" style="display:none;">
                 <div class="prompt-preview-header">
@@ -76,8 +96,35 @@
         <!-- Upload Tab -->
         <div class="tab-content" id="tab-upload">
             <div class="controls">
-                <label for="file-input">Select MP4 file:</label>
-                <input type="file" id="file-input" accept="video/mp4,audio/*,.mp4,.wav,.m4a,.webm">
+                <div class="controls-row">
+                    <div class="control-group" style="flex:2;">
+                        <div class="drop-zone" id="drop-zone">
+                            <svg class="drop-zone-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <p class="drop-zone-text">Drop audio/video file here or <strong>click to browse</strong></p>
+                            <p class="drop-zone-file" id="drop-zone-filename"></p>
+                            <input type="file" id="file-input" accept="video/mp4,audio/*,.mp4,.wav,.m4a,.webm">
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label for="lang-upload">Language:</label>
+                        <select id="lang-upload">
+                            <option value="">Auto-detect</option>
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="it">Italian</option>
+                            <option value="nl">Dutch</option>
+                            <option value="ja">Japanese</option>
+                            <option value="zh">Chinese</option>
+                            <option value="ko">Korean</option>
+                            <option value="ar">Arabic</option>
+                            <option value="hi">Hindi</option>
+                            <option value="ru">Russian</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="button-group">
                     <button id="btn-upload" class="btn btn-primary" disabled>Transcribe</button>
                     <button id="btn-cancel-upload" class="btn btn-danger" style="display:none;">Cancel</button>
@@ -93,6 +140,7 @@
                 <span class="progress-timer" id="upload-timer">0s</span>
             </div>
             <div class="transcript-wrapper">
+                <span class="word-count" id="upload-word-count"></span>
                 <button class="btn-copy" id="copy-upload" title="Copy transcript">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     <span>Copy</span>
@@ -100,11 +148,11 @@
                 <div class="transcript-box" id="upload-transcript">
                     <p class="placeholder">Upload a file to see the transcript...</p>
                 </div>
-            </div>
-            <div class="action-buttons" id="upload-actions" style="display:none;">
-                <button id="btn-summarize-upload" class="btn btn-secondary">Summarize with AI</button>
-                <button id="btn-copilot-upload" class="btn btn-copilot">Copy summary prompt</button>
-                <button id="btn-preview-upload" class="btn btn-outline">Preview prompt</button>
+                <div class="action-buttons" id="upload-actions">
+                    <button id="btn-summarize-upload" class="btn btn-secondary">Summarize with AI</button>
+                    <button id="btn-copilot-upload" class="btn btn-copilot">Copy summary prompt</button>
+                    <button id="btn-preview-upload" class="btn btn-outline">Preview prompt</button>
+                </div>
             </div>
             <div class="prompt-preview" id="upload-preview" style="display:none;">
                 <div class="prompt-preview-header">
@@ -118,6 +166,10 @@
 
         <!-- History Tab -->
         <div class="tab-content" id="tab-history">
+            <div class="history-search-wrapper">
+                <svg class="history-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="history-search" class="history-search" placeholder="Search transcripts...">
+            </div>
             <div id="history-list" class="history-list">
                 <p class="placeholder">Loading...</p>
             </div>

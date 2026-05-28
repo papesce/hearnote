@@ -100,11 +100,12 @@ async def index():
 @app.websocket("/ws/transcribe")
 async def websocket_transcribe(websocket: WebSocket):
     await websocket.accept()
+    lang = websocket.query_params.get("lang") or None
     chunks: list[str] = []
     try:
         while True:
             data = await websocket.receive_bytes()
-            text = await asyncio.to_thread(transcribe_audio_chunk, data)
+            text = await asyncio.to_thread(transcribe_audio_chunk, data, lang)
             if text.strip():
                 chunks.append(text.strip())
                 await websocket.send_json({"text": text})
@@ -145,11 +146,11 @@ async def upload_transcribe(file: UploadFile = File(...)):
 # --- Streaming File Transcription ---
 
 
-def _transcribe_worker(file_path: str, pipe_conn):
+def _transcribe_worker(file_path: str, language: str | None, pipe_conn):
     """Runs in a separate process so it can be killed immediately."""
     from transcriber import transcribe_file_stream
     try:
-        for seg in transcribe_file_stream(file_path):
+        for seg in transcribe_file_stream(file_path, language=language):
             pipe_conn.send(seg)
         pipe_conn.send(None)
     except Exception as e:
@@ -162,7 +163,7 @@ _active_jobs: dict[str, multiprocessing.Process] = {}
 
 
 @app.post("/api/transcribe/stream")
-async def upload_transcribe_stream(file: UploadFile = File(...)):
+async def upload_transcribe_stream(file: UploadFile = File(...), lang: str | None = None):
     file_id = str(uuid.uuid4())
     ext = Path(file.filename).suffix or ".mp4"
     file_path = UPLOAD_DIR / f"{file_id}{ext}"
@@ -172,6 +173,7 @@ async def upload_transcribe_stream(file: UploadFile = File(...)):
             f.write(chunk)
 
     filename = file.filename
+    language = lang or None
 
     async def event_stream():
         segments = []
@@ -179,7 +181,7 @@ async def upload_transcribe_stream(file: UploadFile = File(...)):
 
         proc = multiprocessing.Process(
             target=_transcribe_worker,
-            args=(str(file_path), child_conn),
+            args=(str(file_path), language, child_conn),
             daemon=True,
         )
         _active_jobs[file_id] = proc

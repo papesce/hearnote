@@ -30,6 +30,9 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 TRANSCRIPTS_DIR = Path("transcripts")
 TRANSCRIPTS_DIR.mkdir(exist_ok=True)
 
+RECORDINGS_DIR = Path("recordings")
+RECORDINGS_DIR.mkdir(exist_ok=True)
+
 STATIC_DIR = Path("static")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -112,9 +115,14 @@ async def websocket_transcribe(websocket: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
+        transcript_id = None
         if chunks:
             full_text = " ".join(chunks)
-            save_transcript(source="live", text=full_text)
+            transcript_id = save_transcript(source="live", text=full_text)
+        try:
+            await websocket.send_json({"event": "stopped", "transcriptId": transcript_id})
+        except Exception:
+            pass
 
 
 # --- File Upload Transcription ---
@@ -286,7 +294,7 @@ def save_transcript(
     text: str,
     segments: list[dict] | None = None,
     filename: str | None = None,
-):
+) -> str:
     transcript_id = str(uuid.uuid4())
     record = {
         "id": transcript_id,
@@ -295,9 +303,11 @@ def save_transcript(
         "text": text,
         "segments": segments,
         "filename": filename,
+        "has_recording": False,
     }
     path = TRANSCRIPTS_DIR / f"{transcript_id}.json"
     path.write_text(json.dumps(record, ensure_ascii=False, indent=2))
+    return transcript_id
 
 
 @app.get("/api/transcripts")
@@ -312,6 +322,7 @@ async def list_transcripts():
                 "source": data["source"],
                 "filename": data.get("filename"),
                 "preview": data["text"][:120],
+                "has_recording": data.get("has_recording", False),
             })
         except (json.JSONDecodeError, KeyError):
             continue
@@ -332,7 +343,35 @@ async def delete_transcript(transcript_id: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="Transcript not found")
     path.unlink()
+    recording_path = RECORDINGS_DIR / f"{transcript_id}.webm"
+    recording_path.unlink(missing_ok=True)
     return {"ok": True}
+
+
+# --- Recordings ---
+
+@app.post("/api/recordings/{transcript_id}")
+async def upload_recording(transcript_id: str, file: UploadFile = File(...)):
+    recording_path = RECORDINGS_DIR / f"{transcript_id}.webm"
+    with open(recording_path, "wb") as f:
+        while chunk := await file.read(1024 * 1024):
+            f.write(chunk)
+
+    transcript_path = TRANSCRIPTS_DIR / f"{transcript_id}.json"
+    if transcript_path.exists():
+        data = json.loads(transcript_path.read_text())
+        data["has_recording"] = True
+        transcript_path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+
+    return {"ok": True}
+
+
+@app.get("/api/recordings/{transcript_id}")
+async def get_recording(transcript_id: str):
+    recording_path = RECORDINGS_DIR / f"{transcript_id}.webm"
+    if not recording_path.exists():
+        raise HTTPException(status_code=404, detail="Recording not found")
+    return FileResponse(recording_path, media_type="audio/webm", filename=f"{transcript_id}.webm")
 
 
 # --- Model Settings ---

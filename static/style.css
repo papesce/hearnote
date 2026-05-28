@@ -299,6 +299,43 @@ select, input[type="file"] {
     color: #fff;
 }
 
+.btn-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #1a3d2a;
+    color: #4cceac;
+    text-decoration: none;
+}
+
+.btn-download:hover {
+    background: #245a3a;
+}
+
+.audio-player {
+    margin-top: 0.75rem;
+}
+
+.audio-player audio {
+    width: 100%;
+    height: 36px;
+    border-radius: 6px;
+}
+
+.audio-player-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: #4cceac;
+    text-decoration: none;
+    margin-top: 0.5rem;
+}
+
+.audio-player-link:hover {
+    color: #6eeece;
+}
+
 .status {
     margin-bottom: 1rem;
     font-size: 0.85rem;

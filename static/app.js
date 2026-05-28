@@ -55,6 +55,7 @@ loadCurrentModel();
 const audioSourceSelect = document.getElementById('audio-source');
 const btnStart = document.getElementById('btn-start');
 const btnStop = document.getElementById('btn-stop');
+const btnDownloadRecording = document.getElementById('btn-download-recording');
 const liveStatus = document.getElementById('live-status');
 const liveTranscript = document.getElementById('live-transcript');
 const btnSummarizeLive = document.getElementById('btn-summarize-live');
@@ -67,6 +68,9 @@ let audioContext = null;
 let processor = null;
 let websocket = null;
 let isRecording = false;
+let mediaRecorder = null;
+let recordedChunks = [];
+let currentTranscriptId = null;
 
 async function populateAudioDevices() {
     try {
@@ -148,6 +152,7 @@ async function startRecording() {
         isRecording = true;
         btnStart.style.display = 'none';
         btnStop.style.display = 'inline-block';
+        btnDownloadRecording.style.display = 'none';
         liveTranscript.innerHTML = '';
         liveTranscript.classList.remove('has-content');
         setActionButtonsEnabled(liveActions, false);
@@ -155,10 +160,27 @@ async function startRecording() {
         document.getElementById('live-word-count').textContent = '';
         liveStatus.innerHTML = '<span class="recording-indicator"></span>Recording...';
         liveStatus.className = 'status recording';
+        currentTranscriptId = null;
+
+        // Start MediaRecorder for saving audio
+        recordedChunks = [];
+        try {
+            mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm;codecs=opus' });
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+            mediaRecorder.start(1000);
+        } catch {
+            mediaRecorder = null;
+        }
     };
 
     websocket.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        if (data.event === 'stopped' && data.transcriptId) {
+            currentTranscriptId = data.transcriptId;
+            return;
+        }
         if (data.text) {
             const span = document.createElement('span');
             span.textContent = data.text + ' ';
@@ -187,6 +209,30 @@ function stopRecording() {
     btnStop.style.display = 'none';
     liveStatus.textContent = 'Stopped.';
     liveStatus.className = 'status done';
+
+    // Stop MediaRecorder and create download blob
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        mediaRecorder.onstop = () => {
+            if (recordedChunks.length > 0) {
+                const blob = new Blob(recordedChunks, { type: 'audio/webm;codecs=opus' });
+                const url = URL.createObjectURL(blob);
+                btnDownloadRecording.href = url;
+                btnDownloadRecording.style.display = 'inline-flex';
+
+                // Upload to server in the background
+                if (currentTranscriptId) {
+                    const formData = new FormData();
+                    formData.append('file', blob, 'recording.webm');
+                    fetch(`/api/recordings/${currentTranscriptId}`, {
+                        method: 'POST',
+                        body: formData,
+                    }).catch(() => {});
+                }
+            }
+        };
+    }
+    mediaRecorder = null;
 
     if (processor) {
         processor.disconnect();
@@ -702,10 +748,20 @@ async function viewTranscript(id) {
         const data = await resp.json();
 
         const date = new Date(data.timestamp);
+        const audioHtml = data.has_recording ? `
+            <div class="audio-player">
+                <audio controls src="/api/recordings/${data.id}"></audio>
+                <a class="audio-player-link" href="/api/recordings/${data.id}" download="${data.id}.webm">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download audio
+                </a>
+            </div>` : '';
+
         historyMeta.innerHTML = `
             <span class="history-source ${data.source}">${data.source}</span>
             <span>${date.toLocaleString()}</span>
             ${data.filename ? `<span>${data.filename}</span>` : ''}
+            ${audioHtml}
         `;
 
         if (data.segments) {

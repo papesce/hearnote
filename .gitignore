@@ -1,14 +1,24 @@
+# Python
 venv/
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+
+# macOS
 .DS_Store
+
+# App data
 uploads/
 transcripts/
 recordings/
 gitignore/
-
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
 static/assets/
+
+# Environment
+.env
+.env.local

@@ -154,5 +154,7 @@ export function useWebSocket() {
     start,
     stop,
     reset,
+    audioContextRef,
+    streamRef,
   };
 }

@@ -7,6 +7,7 @@ import { TranscriptView } from './TranscriptView';
 import { SummaryPanel } from './SummaryPanel';
 import { AudioPlayer } from './AudioPlayer';
 import { SettingsBar } from './SettingsBar';
+import { WaveformVisualizer } from './WaveformVisualizer';
 
 export function LiveRecording() {
   const { devices, error: deviceError } = useAudioDevices();
@@ -87,10 +88,11 @@ export function LiveRecording() {
       )}
 
       {ws.status === 'recording' && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="w-2 h-2 rounded-full bg-error animate-pulse-recording" />
-          <span className="text-text-secondary">Recording...</span>
-        </div>
+        <WaveformVisualizer
+          audioContext={ws.audioContextRef.current}
+          stream={ws.streamRef.current}
+          isActive={ws.isRecording}
+        />
       )}
 
       {ws.status === 'stopping' && (

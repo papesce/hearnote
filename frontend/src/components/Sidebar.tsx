@@ -149,7 +149,24 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
       {/* Transcript list */}
       <div className="flex-1 overflow-y-auto px-2 pb-4" role="list" aria-label="Transcript history">
         {transcripts.length === 0 && (
-          <p className="text-text-secondary text-xs text-center py-6">No transcripts yet</p>
+          <div className="text-center py-8 px-3">
+            <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-3">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-accent">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+            </div>
+            <p className="text-text-primary text-sm font-medium mb-1">No recordings yet</p>
+            <p className="text-text-secondary text-xs mb-3">Record your first meeting or upload an audio file to get started.</p>
+            <button
+              onClick={handleRecord}
+              className="text-xs text-accent hover:text-accent-hover font-medium transition-colors"
+            >
+              Start recording
+            </button>
+          </div>
         )}
         {filtered.length === 0 && transcripts.length > 0 && (
           <p className="text-text-secondary text-xs text-center py-6">No results</p>

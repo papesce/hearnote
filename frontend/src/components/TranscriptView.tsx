@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import type { Segment } from '../types';
 
 function formatTime(seconds: number): string {
@@ -17,6 +17,17 @@ interface Props {
 
 export function TranscriptView({ text, segments, placeholder = 'Transcript will appear here...', currentTime, onSeek }: Props) {
   const activeRef = useRef<HTMLDivElement>(null);
+  const [liveAnnouncement, setLiveAnnouncement] = useState('');
+  const prevCountRef = useRef(0);
+
+  useEffect(() => {
+    const count = segments?.length ?? text?.length ?? 0;
+    if (count > prevCountRef.current) {
+      const latest = segments?.[count - 1]?.text ?? text?.[count - 1];
+      if (latest) setLiveAnnouncement(latest);
+    }
+    prevCountRef.current = count;
+  }, [segments, text]);
 
   const wordCount = useMemo(() => {
     if (segments?.length) {
@@ -46,7 +57,11 @@ export function TranscriptView({ text, segments, placeholder = 'Transcript will 
 
   return (
     <div className="relative">
-      <div className="bg-bg-secondary rounded-lg p-4 min-h-[120px] text-left">
+      {/* Screen reader live region for streaming transcript */}
+      <div aria-live="polite" aria-atomic="false" className="sr-only">
+        {liveAnnouncement}
+      </div>
+      <div className="bg-bg-secondary rounded-lg p-4 min-h-[120px] text-left" role="log" aria-label="Transcript">
         {!hasContent && (
           <p className="text-text-secondary italic">{placeholder}</p>
         )}

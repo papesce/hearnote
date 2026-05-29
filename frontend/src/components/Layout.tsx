@@ -38,12 +38,15 @@ export function Layout({ children }: Props) {
       )}
 
       {/* Sidebar */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-30 w-[280px] bg-bg-secondary border-r border-bg-tertiary
-        transform transition-transform duration-200 ease-in-out
-        md:relative md:translate-x-0 md:flex-shrink-0
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
+      <aside
+        aria-label="Navigation sidebar"
+        className={`
+          fixed inset-y-0 left-0 z-30 w-[280px] bg-bg-secondary border-r border-bg-tertiary
+          transform transition-transform duration-200 ease-in-out
+          md:relative md:translate-x-0 md:flex-shrink-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
         <Sidebar
           selectedId={selectedTranscriptId}
           activeView={activeView}
@@ -60,6 +63,7 @@ export function Layout({ children }: Props) {
         <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-bg-primary border-b border-bg-tertiary md:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open navigation menu"
             className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-secondary"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

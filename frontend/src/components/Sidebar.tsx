@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { TranscriptListItem } from '../types';
 import { fetchTranscripts, deleteTranscript } from '../api/client';
+import { useTheme } from '../hooks/useTheme';
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -21,6 +22,7 @@ interface Props {
 export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecording, onNewUpload, onCloseMobile }: Props) {
   const [transcripts, setTranscripts] = useState<TranscriptListItem[]>([]);
   const [search, setSearch] = useState('');
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const load = useCallback(async () => {
     try {
@@ -67,20 +69,47 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent flex-shrink-0">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-          <line x1="12" y1="19" x2="12" y2="23" />
-          <line x1="8" y1="23" x2="16" y2="23" />
-        </svg>
-        <span className="text-lg font-semibold text-text-primary">Hearnote</span>
+      <div className="flex items-center justify-between px-4 pt-5 pb-4">
+        <div className="flex items-center gap-2.5">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent flex-shrink-0">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="23" />
+            <line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
+          <span className="text-lg font-semibold text-text-primary">Hearnote</span>
+        </div>
+        <button
+          onClick={toggleTheme}
+          className="p-1.5 rounded-lg bg-bg-tertiary hover:bg-accent/20 text-text-secondary hover:text-text-primary transition-colors"
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        >
+          {theme === 'dark' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          )}
+        </button>
       </div>
 
       {/* Action buttons */}
       <div className="flex gap-2 px-4 pb-3">
         <button
           onClick={handleRecord}
+          aria-label="Start new recording"
           className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
             ${activeView === 'live' ? 'bg-accent text-white' : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'}`}
         >
@@ -92,6 +121,7 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
         </button>
         <button
           onClick={handleUpload}
+          aria-label="Upload audio file"
           className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
             ${activeView === 'upload' ? 'bg-accent text-white' : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'}`}
         >
@@ -111,12 +141,13 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
           placeholder="Search..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-bg-tertiary border border-bg-tertiary rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-accent"
+          aria-label="Search transcripts"
+          className="w-full bg-bg-tertiary border border-bg-tertiary rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder:text-text-secondary"
         />
       </div>
 
       {/* Transcript list */}
-      <div className="flex-1 overflow-y-auto px-2 pb-4">
+      <div className="flex-1 overflow-y-auto px-2 pb-4" role="list" aria-label="Transcript history">
         {transcripts.length === 0 && (
           <p className="text-text-secondary text-xs text-center py-6">No transcripts yet</p>
         )}
@@ -126,6 +157,7 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
         {filtered.map(t => (
           <div
             key={t.id}
+            role="listitem"
             onClick={() => handleSelect(t.id)}
             className={`px-3 py-2.5 rounded-lg mb-1 cursor-pointer transition-colors group
               ${selectedId === t.id ? 'bg-accent/10 border border-accent/30' : 'hover:bg-bg-tertiary border border-transparent'}`}
@@ -136,7 +168,7 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
                   ${t.source === 'live' ? 'bg-success' : ''}
                   ${t.source === 'upload' ? 'bg-accent' : ''}
                   ${t.source === 'retranscribe' ? 'bg-warning' : ''}
-                `} />
+                `} aria-label={`Source: ${t.source}`} />
                 <span className="text-xs text-text-secondary">
                   {new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                   {' '}
@@ -145,8 +177,9 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
               </div>
               <button
                 onClick={(e) => handleDelete(e, t.id)}
-                className="opacity-0 group-hover:opacity-100 p-0.5 text-text-secondary hover:text-error transition-all"
-                title="Delete"
+                className="md:opacity-0 md:group-hover:opacity-100 opacity-70 p-1 text-text-secondary hover:text-error transition-all rounded"
+                title="Delete transcript"
+                aria-label="Delete transcript"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { summarizeText } from '../api/client';
 
 function buildSummaryPrompt(transcript: string): string {
@@ -31,8 +31,20 @@ export function SummaryPanel({ getTranscriptText }: Props) {
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showPrompt, setShowPrompt] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
 
   const handleSummarize = async () => {
     const text = getTranscriptText();
@@ -43,8 +55,10 @@ export function SummaryPanel({ getTranscriptText }: Props) {
     try {
       const result = await summarizeText(text);
       setSummary(result);
-    } catch (err) {
-      setError((err as Error).message);
+    } catch {
+      const text = getTranscriptText();
+      navigator.clipboard.writeText(buildSummaryPrompt(text));
+      setError('AI unavailable — prompt copied to clipboard');
     } finally {
       setLoading(false);
     }
@@ -55,6 +69,15 @@ export function SummaryPanel({ getTranscriptText }: Props) {
     if (!text) return;
     navigator.clipboard.writeText(buildSummaryPrompt(text));
     setCopied(true);
+    setMenuOpen(false);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopySummary = () => {
+    if (!summary) return;
+    navigator.clipboard.writeText(summary);
+    setCopied(true);
+    setMenuOpen(false);
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -63,41 +86,67 @@ export function SummaryPanel({ getTranscriptText }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex items-center gap-2">
         <button
           onClick={handleSummarize}
           disabled={loading}
-          className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded text-sm transition-colors disabled:opacity-50"
+          className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >
-          {loading ? 'Summarizing...' : 'Summarize with AI'}
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              Summarizing...
+            </span>
+          ) : 'Summarize'}
         </button>
-        <button
-          onClick={handleCopyPrompt}
-          className="px-3 py-1.5 bg-bg-tertiary hover:bg-accent/20 text-text-primary rounded text-sm transition-colors"
-        >
-          {copied ? 'Copied!' : 'Copy prompt'}
-        </button>
-        <button
-          onClick={() => setShowPrompt(!showPrompt)}
-          className="px-3 py-1.5 bg-bg-tertiary hover:bg-accent/20 text-text-primary rounded text-sm transition-colors"
-        >
-          {showPrompt ? 'Hide prompt' : 'Preview prompt'}
-        </button>
+
+        {/* Dropdown menu */}
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-2 bg-bg-tertiary hover:bg-accent/20 text-text-secondary hover:text-text-primary rounded-lg transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="2" />
+              <circle cx="12" cy="12" r="2" />
+              <circle cx="12" cy="19" r="2" />
+            </svg>
+          </button>
+          {menuOpen && (
+            <div className="absolute left-0 top-full mt-1 bg-bg-secondary border border-bg-tertiary rounded-lg shadow-lg py-1 z-10 min-w-[160px]">
+              <button
+                onClick={handleCopyPrompt}
+                className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-bg-tertiary transition-colors"
+              >
+                Copy as prompt
+              </button>
+              {summary && (
+                <button
+                  onClick={handleCopySummary}
+                  className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-bg-tertiary transition-colors"
+                >
+                  Copy summary
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {copied && (
+          <span className="text-xs text-success">Copied!</span>
+        )}
       </div>
 
-      {showPrompt && (
-        <pre className="bg-bg-tertiary p-3 rounded text-xs text-text-secondary overflow-x-auto whitespace-pre-wrap">
-          {buildSummaryPrompt(text)}
-        </pre>
-      )}
-
       {error && (
-        <p className="text-error text-sm">{error}</p>
+        <p className="text-warning text-sm">{error}</p>
       )}
 
       {summary && (
         <div
-          className="bg-bg-secondary p-4 rounded-lg text-left text-sm prose prose-invert max-w-none"
+          className="bg-bg-secondary border border-bg-tertiary p-4 rounded-lg text-left text-sm"
           dangerouslySetInnerHTML={{ __html: formatSummary(summary) }}
         />
       )}

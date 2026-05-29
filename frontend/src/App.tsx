@@ -1,16 +1,18 @@
 import { Layout } from './components/Layout';
 import { LiveRecording } from './components/LiveRecording';
 import { FileUpload } from './components/FileUpload';
-import { History } from './components/History';
+import { TranscriptDetail } from './components/TranscriptDetail';
 
 function App() {
   return (
     <Layout>
-      {(activeTab) => (
+      {(activeView, selectedTranscriptId) => (
         <>
-          {activeTab === 'live' && <LiveRecording />}
-          {activeTab === 'upload' && <FileUpload />}
-          {activeTab === 'history' && <History />}
+          {activeView === 'live' && <LiveRecording />}
+          {activeView === 'upload' && <FileUpload />}
+          {activeView === 'detail' && selectedTranscriptId && (
+            <TranscriptDetail transcriptId={selectedTranscriptId} />
+          )}
         </>
       )}
     </Layout>

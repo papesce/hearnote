@@ -1,0 +1,158 @@
+import { useState, useEffect, useCallback } from 'react';
+import type { TranscriptListItem } from '../types';
+import { fetchTranscripts, deleteTranscript } from '../api/client';
+
+interface Props {
+  selectedId: string | null;
+  activeView: 'live' | 'upload' | 'detail';
+  onSelectTranscript: (id: string) => void;
+  onNewRecording: () => void;
+  onNewUpload: () => void;
+  onCloseMobile?: () => void;
+}
+
+export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecording, onNewUpload, onCloseMobile }: Props) {
+  const [transcripts, setTranscripts] = useState<TranscriptListItem[]>([]);
+  const [search, setSearch] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const items = await fetchTranscripts();
+      setTranscripts(items);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await deleteTranscript(id);
+    load();
+  };
+
+  const handleSelect = (id: string) => {
+    onSelectTranscript(id);
+    onCloseMobile?.();
+  };
+
+  const handleRecord = () => {
+    onNewRecording();
+    onCloseMobile?.();
+  };
+
+  const handleUpload = () => {
+    onNewUpload();
+    onCloseMobile?.();
+  };
+
+  const filtered = search
+    ? transcripts.filter(t =>
+        t.preview.toLowerCase().includes(search.toLowerCase()) ||
+        (t.filename?.toLowerCase().includes(search.toLowerCase()))
+      )
+    : transcripts;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent flex-shrink-0">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="23" />
+          <line x1="8" y1="23" x2="16" y2="23" />
+        </svg>
+        <span className="text-lg font-semibold text-text-primary">Hearnote</span>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex gap-2 px-4 pb-3">
+        <button
+          onClick={handleRecord}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+            ${activeView === 'live' ? 'bg-accent text-white' : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'}`}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          </svg>
+          Record
+        </button>
+        <button
+          onClick={handleUpload}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+            ${activeView === 'upload' ? 'bg-accent text-white' : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'}`}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          Upload
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="px-4 pb-3">
+        <input
+          type="text"
+          placeholder="Search..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full bg-bg-tertiary border border-bg-tertiary rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-accent"
+        />
+      </div>
+
+      {/* Transcript list */}
+      <div className="flex-1 overflow-y-auto px-2 pb-4">
+        {transcripts.length === 0 && (
+          <p className="text-text-secondary text-xs text-center py-6">No transcripts yet</p>
+        )}
+        {filtered.length === 0 && transcripts.length > 0 && (
+          <p className="text-text-secondary text-xs text-center py-6">No results</p>
+        )}
+        {filtered.map(t => (
+          <div
+            key={t.id}
+            onClick={() => handleSelect(t.id)}
+            className={`px-3 py-2.5 rounded-lg mb-1 cursor-pointer transition-colors group
+              ${selectedId === t.id ? 'bg-accent/10 border border-accent/30' : 'hover:bg-bg-tertiary border border-transparent'}`}
+          >
+            <div className="flex items-center justify-between mb-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0
+                  ${t.source === 'live' ? 'bg-success' : ''}
+                  ${t.source === 'upload' ? 'bg-accent' : ''}
+                  ${t.source === 'retranscribe' ? 'bg-warning' : ''}
+                `} />
+                <span className="text-xs text-text-secondary">
+                  {new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  {' '}
+                  {new Date(t.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <button
+                onClick={(e) => handleDelete(e, t.id)}
+                className="opacity-0 group-hover:opacity-100 p-0.5 text-text-secondary hover:text-error transition-all"
+                title="Delete"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" />
+                </svg>
+              </button>
+            </div>
+            {t.filename && (
+              <p className="text-xs text-text-secondary truncate mb-0.5">{t.filename}</p>
+            )}
+            <p className="text-xs text-text-primary truncate leading-relaxed">{t.preview}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

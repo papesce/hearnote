@@ -1,50 +1,79 @@
 import { useState, type ReactNode } from 'react';
+import { Sidebar } from './Sidebar';
 
-type Tab = 'live' | 'upload' | 'history';
+export type ActiveView = 'live' | 'upload' | 'detail';
 
 interface Props {
-  children: (activeTab: Tab) => ReactNode;
+  children: (activeView: ActiveView, selectedTranscriptId: string | null) => ReactNode;
 }
 
 export function Layout({ children }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('live');
+  const [activeView, setActiveView] = useState<ActiveView>('live');
+  const [selectedTranscriptId, setSelectedTranscriptId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'live', label: 'Live Recording' },
-    { id: 'upload', label: 'Upload File' },
-    { id: 'history', label: 'History' },
-  ];
+  const handleSelectTranscript = (id: string) => {
+    setSelectedTranscriptId(id);
+    setActiveView('detail');
+  };
+
+  const handleNewRecording = () => {
+    setSelectedTranscriptId(null);
+    setActiveView('live');
+  };
+
+  const handleNewUpload = () => {
+    setSelectedTranscriptId(null);
+    setActiveView('upload');
+  };
 
   return (
-    <div className="max-w-[800px] mx-auto px-4 py-6 min-h-screen">
-      <header className="flex items-center gap-3 mb-6">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-          <line x1="12" y1="19" x2="12" y2="23" />
-          <line x1="8" y1="23" x2="16" y2="23" />
-        </svg>
-        <h1 className="text-xl font-semibold text-text-primary">Hearnote</h1>
-      </header>
+    <div className="flex h-screen overflow-hidden">
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      <nav className="flex border-b border-bg-tertiary mb-6">
-        {tabs.map(tab => (
+      {/* Sidebar */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-30 w-[280px] bg-bg-secondary border-r border-bg-tertiary
+        transform transition-transform duration-200 ease-in-out
+        md:relative md:translate-x-0 md:flex-shrink-0
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <Sidebar
+          selectedId={selectedTranscriptId}
+          activeView={activeView}
+          onSelectTranscript={handleSelectTranscript}
+          onNewRecording={handleNewRecording}
+          onNewUpload={handleNewUpload}
+          onCloseMobile={() => setSidebarOpen(false)}
+        />
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-y-auto min-w-0">
+        {/* Mobile header */}
+        <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-bg-primary border-b border-bg-tertiary md:hidden">
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px
-              ${activeTab === tab.id
-                ? 'text-accent border-accent'
-                : 'text-text-secondary border-transparent hover:text-text-primary'
-              }`}
+            onClick={() => setSidebarOpen(true)}
+            className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-secondary"
           >
-            {tab.label}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
           </button>
-        ))}
-      </nav>
+          <span className="text-sm font-medium text-text-primary">Hearnote</span>
+        </div>
 
-      <main>
-        {children(activeTab)}
+        <div className="max-w-[700px] mx-auto px-6 py-6">
+          {children(activeView, selectedTranscriptId)}
+        </div>
       </main>
     </div>
   );

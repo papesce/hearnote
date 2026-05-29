@@ -12,7 +12,7 @@ __pycache__/
 uploads/
 transcripts/
 recordings/
-gitignore/
+gitignore-this/
 # Frontend
 frontend/node_modules/
 frontend/dist/

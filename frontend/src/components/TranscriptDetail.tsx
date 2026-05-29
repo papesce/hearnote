@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Transcript } from '../types';
 import { fetchTranscript, retranscribe } from '../api/client';
 import { TranscriptView } from './TranscriptView';
 import { SummaryPanel } from './SummaryPanel';
-import { AudioPlayer } from './AudioPlayer';
+import { AudioPlayer, type AudioPlayerHandle } from './AudioPlayer';
 import { LANGUAGES } from './SettingsBar';
 
 interface Props {
@@ -15,6 +15,8 @@ export function TranscriptDetail({ transcriptId }: Props) {
   const [retranscribeLang, setRetranscribeLang] = useState('');
   const [retranscribeStatus, setRetranscribeStatus] = useState('');
   const [showRetranscribe, setShowRetranscribe] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const playerRef = useRef<AudioPlayerHandle>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,10 +26,19 @@ export function TranscriptDetail({ transcriptId }: Props) {
         setDetail(data);
         setShowRetranscribe(false);
         setRetranscribeStatus('');
+        setCurrentTime(0);
       }
     })();
     return () => { cancelled = true; };
   }, [transcriptId]);
+
+  const handleSeek = useCallback((time: number) => {
+    playerRef.current?.seek(time);
+  }, []);
+
+  const handleTimeUpdate = useCallback((time: number) => {
+    setCurrentTime(time);
+  }, []);
 
   const handleRetranscribe = async () => {
     if (!detail) return;
@@ -69,14 +80,18 @@ export function TranscriptDetail({ transcriptId }: Props) {
 
       {hasRecording && (
         <AudioPlayer
+          ref={playerRef}
           src={`/api/recordings/${detail.id}`}
           downloadFilename={`${detail.id}.webm`}
+          onTimeUpdate={handleTimeUpdate}
         />
       )}
 
       <TranscriptView
         segments={detail.segments ?? undefined}
         text={!detail.segments ? [detail.text] : undefined}
+        currentTime={hasRecording ? currentTime : undefined}
+        onSeek={hasRecording ? handleSeek : undefined}
       />
 
       {hasRecording && (

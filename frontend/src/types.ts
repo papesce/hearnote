@@ -3,6 +3,7 @@ export interface Segment {
   end: number;
   text: string;
   duration?: number;
+  speaker?: string;
 }
 
 export interface Transcript {

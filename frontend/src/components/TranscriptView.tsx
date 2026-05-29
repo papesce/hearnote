@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import type { Segment } from '../types';
 
 function formatTime(seconds: number): string {
@@ -11,9 +11,13 @@ interface Props {
   text?: string[];
   segments?: Segment[] | null;
   placeholder?: string;
+  currentTime?: number;
+  onSeek?: (time: number) => void;
 }
 
-export function TranscriptView({ text, segments, placeholder = 'Transcript will appear here...' }: Props) {
+export function TranscriptView({ text, segments, placeholder = 'Transcript will appear here...', currentTime, onSeek }: Props) {
+  const activeRef = useRef<HTMLDivElement>(null);
+
   const wordCount = useMemo(() => {
     if (segments?.length) {
       return segments.reduce((acc, s) => acc + s.text.split(/\s+/).filter(Boolean).length, 0);
@@ -24,20 +28,57 @@ export function TranscriptView({ text, segments, placeholder = 'Transcript will 
     return 0;
   }, [text, segments]);
 
+  const activeIndex = useMemo(() => {
+    if (currentTime == null || !segments?.length) return -1;
+    for (let i = segments.length - 1; i >= 0; i--) {
+      if (currentTime >= segments[i].start) return i;
+    }
+    return -1;
+  }, [currentTime, segments]);
+
+  useEffect(() => {
+    if (activeRef.current) {
+      activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [activeIndex]);
+
   const hasContent = (text && text.length > 0) || (segments && segments.length > 0);
 
   return (
     <div className="relative">
-      <div className="bg-bg-secondary rounded-lg p-4 max-h-[500px] overflow-y-auto min-h-[120px] text-left">
+      <div className="bg-bg-secondary rounded-lg p-4 min-h-[120px] text-left">
         {!hasContent && (
           <p className="text-text-secondary italic">{placeholder}</p>
         )}
-        {segments?.map((seg, i) => (
-          <div key={i} className="mb-2">
-            <span className="text-accent text-xs font-mono mr-2">{formatTime(seg.start)}</span>
-            <span>{seg.text}</span>
-          </div>
-        ))}
+        {segments?.map((seg, i) => {
+          const isActive = i === activeIndex;
+          const speaker = seg.speaker;
+          return (
+            <div
+              key={i}
+              ref={isActive ? activeRef : undefined}
+              className={`flex gap-2 py-1.5 px-2 -mx-2 rounded transition-colors
+                ${isActive ? 'bg-accent/10' : ''}
+              `}
+            >
+              <button
+                onClick={() => onSeek?.(seg.start)}
+                disabled={!onSeek}
+                className={`text-xs font-mono flex-shrink-0 pt-0.5 transition-colors
+                  ${onSeek ? 'text-accent hover:text-accent-hover cursor-pointer' : 'text-accent cursor-default'}
+                `}
+              >
+                {formatTime(seg.start)}
+              </button>
+              <div className="min-w-0">
+                {speaker && (
+                  <span className="text-xs font-medium text-text-secondary mr-1.5">{speaker}:</span>
+                )}
+                <span className="text-text-primary">{seg.text}</span>
+              </div>
+            </div>
+          );
+        })}
         {!segments && text?.map((chunk, i) => (
           <span key={i}>{chunk} </span>
         ))}

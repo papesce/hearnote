@@ -65,7 +65,7 @@ export function TranscriptView({ text, segments, placeholder = 'Transcript will 
                 onClick={() => onSeek?.(seg.start)}
                 disabled={!onSeek}
                 className={`text-xs font-mono flex-shrink-0 pt-0.5 transition-colors
-                  ${onSeek ? 'text-accent hover:text-accent-hover cursor-pointer' : 'text-accent cursor-default'}
+                  ${onSeek ? 'text-text-secondary hover:text-accent cursor-pointer' : 'text-text-secondary cursor-default'}
                 `}
               >
                 {formatTime(seg.start)}

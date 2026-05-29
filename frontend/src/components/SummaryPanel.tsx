@@ -116,7 +116,7 @@ export function SummaryPanel({ getTranscriptText }: Props) {
             </svg>
           </button>
           {menuOpen && (
-            <div className="absolute left-0 top-full mt-1 bg-bg-secondary border border-bg-tertiary rounded-lg shadow-lg py-1 z-10 min-w-[160px]">
+            <div className="absolute left-0 top-full mt-1 bg-bg-secondary border border-bg-tertiary rounded-lg shadow-lg py-1 z-10 min-w-[160px] animate-scale-in">
               <button
                 onClick={handleCopyPrompt}
                 className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-bg-tertiary transition-colors"
@@ -146,7 +146,7 @@ export function SummaryPanel({ getTranscriptText }: Props) {
 
       {summary && (
         <div
-          className="bg-bg-secondary border border-bg-tertiary p-4 rounded-lg text-left text-sm"
+          className="bg-bg-secondary border border-bg-tertiary p-4 rounded-lg text-left text-sm animate-fade-in-up"
           dangerouslySetInnerHTML={{ __html: formatSummary(summary) }}
         />
       )}

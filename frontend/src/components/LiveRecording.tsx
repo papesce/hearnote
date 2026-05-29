@@ -88,11 +88,13 @@ export function LiveRecording() {
       )}
 
       {ws.status === 'recording' && (
-        <WaveformVisualizer
-          audioContext={ws.audioContextRef.current}
-          stream={ws.streamRef.current}
-          isActive={ws.isRecording}
-        />
+        <div className="animate-fade-in-up">
+          <WaveformVisualizer
+            audioContext={ws.audioContextRef.current}
+            stream={ws.streamRef.current}
+            isActive={ws.isRecording}
+          />
+        </div>
       )}
 
       {ws.status === 'stopping' && (
@@ -100,7 +102,15 @@ export function LiveRecording() {
       )}
 
       {saveStatus && ws.status === 'done' && (
-        <p className="text-text-secondary text-sm">{saveStatus}</p>
+        <p className="text-sm animate-fade-in">
+          {saveStatus.includes('saved') ? (
+            <span className="text-success">{saveStatus}</span>
+          ) : saveStatus.includes('fail') || saveStatus.includes('error') ? (
+            <span className="text-error">{saveStatus}</span>
+          ) : (
+            <span className="text-text-secondary">{saveStatus}</span>
+          )}
+        </p>
       )}
 
       <TranscriptView

@@ -51,8 +51,8 @@ export function FileUpload() {
       </div>
 
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-          ${dragOver ? 'border-accent bg-accent/10' : 'border-bg-tertiary hover:border-text-secondary'}`}
+        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200
+          ${dragOver ? 'border-accent/60 bg-accent/5 scale-[1.01]' : 'border-bg-tertiary hover:border-text-secondary'}`}
         onClick={() => fileInputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
@@ -102,14 +102,14 @@ export function FileUpload() {
       </div>
 
       {transcription.status === 'processing' && (
-        <div className="space-y-2">
+        <div className="space-y-2 animate-fade-in-up">
           <div className="flex items-center justify-between text-xs text-text-secondary">
             <span>{transcription.segments.length} segments</span>
             <span>{formatElapsed(transcription.elapsed)}</span>
           </div>
-          <div className="w-full h-2 bg-bg-tertiary rounded-full overflow-hidden">
+          <div className="w-full h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
             <div
-              className="h-full bg-accent transition-all duration-300"
+              className="h-full bg-accent rounded-full animate-progress-pulse transition-all duration-500 ease-out"
               style={{ width: `${transcription.progress}%` }}
             />
           </div>
@@ -117,13 +117,13 @@ export function FileUpload() {
       )}
 
       {transcription.status === 'cancelled' && (
-        <p className="text-warning text-sm">
+        <p className="text-warning text-sm animate-fade-in">
           Cancelled — {transcription.segments.length} segments transcribed before stopping.
         </p>
       )}
 
       {transcription.status === 'error' && (
-        <p className="text-error text-sm">{transcription.error}</p>
+        <p className="text-error text-sm animate-fade-in">{transcription.error}</p>
       )}
 
       {(transcription.status === 'done' || transcription.status === 'processing') && transcription.segments.length > 0 && (

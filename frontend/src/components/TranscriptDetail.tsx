@@ -61,7 +61,7 @@ export function TranscriptDetail({ transcriptId }: Props) {
   const hasRecording = detail.has_recording || !!detail.recording_ref;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in-up">
       <div className="flex items-center gap-3 flex-wrap text-sm">
         <span className={`px-2 py-0.5 rounded text-xs font-medium
           ${detail.source === 'live' ? 'bg-success/20 text-success' : ''}

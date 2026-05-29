@@ -541,6 +541,15 @@ async def update_model(req: ModelRequest):
     return {"size": get_live_model_size()}
 
 
+# SPA catch-all: serve index.html for client-side routes
+@app.get("/{path:path}")
+async def spa_fallback(path: str):
+    index_path = STATIC_DIR / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(index_path)
+
+
 # Mount static files last so API routes take priority
 _assets_dir = STATIC_DIR / "assets"
 if _assets_dir.exists():

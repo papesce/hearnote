@@ -1,21 +1,32 @@
 # Hearnote
 
-**Private meeting transcription — nothing leaves your machine.**
+**Local-first meeting transcription — nothing leaves your machine.**
 
-Hearnote is a local-first transcription app powered by Whisper. Record live or upload a file — your audio never touches a cloud.
+Record live audio or drop in a file. Whisper transcribes it on your hardware. Get searchable, timestamped transcripts with AI-powered summaries — all running locally.
+
+![Hearnote](screenshot.png)
+
+## Why Hearnote
+
+- **100% private** — audio and transcripts stay on your machine, period
+- **Real-time** — see words appear as you speak, with a live waveform visualizer
+- **No subscriptions** — runs on open-source models, no API keys needed
+- **Works offline** — no internet required after initial setup
 
 ## Features
 
-- **Live Recording** — transcribe in real-time from your microphone or system audio (BlackHole)
-- **Upload File** — drop in a video/audio file and get a streaming, timestamped transcript
-- **Streaming transcription** — segments appear one by one as they're processed, with a progress bar and elapsed timer
-- **Cancel** — stop an in-progress upload transcription instantly (kills the process, CPU freed immediately)
-- **AI Summaries** — summarize transcripts locally with Ollama (llama3) or copy a prompt to paste into any AI chat
-- **Transcript History** — all sessions saved locally, browsable, searchable, and deletable
-- **Re-transcribe** — re-process a recording with a different model or language
-- **Model Selector** — choose between Fast (base), Balanced (small), or Accurate (medium) for live transcription
-- **Language Selector** — pick the language or leave as Auto-detect
-- **Audio Playback** — play back recordings directly in the app
+| Feature | Description |
+|---------|-------------|
+| Live recording | Transcribe from mic or system audio (BlackHole) in real-time |
+| File upload | Drag in audio/video — streaming progress with cancel support |
+| AI summaries | One-click summaries via Ollama (local) or copy prompt for any AI |
+| Transcript history | Searchable sidebar, pin favorites, click-to-seek playback |
+| Export | Download as .txt, .srt, .vtt, or copy as Markdown |
+| Multi-language | 13 languages + auto-detect |
+| Model selection | Fast / Balanced / Accurate — trade speed for precision |
+| Re-transcribe | Re-process recordings with different settings |
+| Dark & light themes | Toggle in the sidebar |
+| URL routing | Shareable links to specific transcripts |
 
 ## Quick Start
 
@@ -23,31 +34,25 @@ Hearnote is a local-first transcription app powered by Whisper. Record live or u
 # Install Python dependencies
 uv sync
 
-# Install frontend dependencies & build
+# Install frontend & build
 cd frontend && npm install && npm run build && cd ..
 
-# Run the server
+# Run
 uv run python app.py
 ```
 
-Open http://localhost:8000
+Open **http://localhost:8000**
 
 ## Development
 
-For development with hot-reload (React HMR + Python auto-restart):
-
 ```bash
-cd frontend && npm install  # first time only
-./dev.sh                    # starts both servers
-./dev.sh --open             # start and open browser automatically
-./dev.sh -o                 # same, short form
+cd frontend && npm install   # first time only
+./dev.sh                     # starts backend + frontend with hot-reload
+./dev.sh --open              # same, opens browser
 ```
 
-This starts:
-- **FastAPI backend** on port 8000 (auto-restarts on Python changes)
-- **Vite dev server** on port 5173 (React HMR, proxies API/WS to backend)
-
-Access the app at **http://localhost:5173** during development.
+- **Backend** → http://localhost:8000 (FastAPI, auto-restarts on changes)
+- **Frontend** → http://localhost:5173 (Vite, React HMR, proxies API/WS to backend)
 
 ### Production build
 
@@ -55,21 +60,24 @@ Access the app at **http://localhost:5173** during development.
 cd frontend && npm run build
 ```
 
-This outputs the compiled React app to `static/`, which FastAPI serves directly at http://localhost:8000.
+Outputs to `static/`, served by FastAPI at http://localhost:8000.
+
+### VS Code
+
+The repo includes `.vscode/launch.json` with debug configurations:
+- **Full Stack** — launches backend + frontend together
+- **Chrome: Frontend** — attaches debugger with source maps
 
 ## Tech Stack
 
-- **Backend**: FastAPI, faster-whisper, WebSockets
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS
-- **AI**: Whisper (local transcription), Ollama (local summarization)
+- **Backend**: Python, FastAPI, faster-whisper, WebSockets
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4
+- **AI**: Whisper (transcription), Ollama/llama3 (summarization)
+- **Zero cloud dependencies** — everything runs locally
 
 ## AI Summarization
 
-Hearnote offers two ways to summarize transcripts:
-
 ### Option 1: Local with Ollama (fully private)
-
-No data leaves your machine. Requires Ollama running locally:
 
 ```bash
 brew install ollama
@@ -77,79 +85,60 @@ ollama serve
 ollama pull llama3
 ```
 
-After transcribing, click **"Summarize with AI"** — the summary is generated entirely on your machine.
+Click **Summarize** in any transcript — generated entirely on your machine.
 
-### Option 2: Copy prompt for external AI
+### Option 2: External AI
 
-Click **"Copy prompt"** to copy a pre-built prompt with your transcript to the clipboard. Paste it into any AI assistant (Copilot, ChatGPT, Claude, Gemini, etc.).
+If Ollama isn't available, the prompt is automatically copied to your clipboard. Paste it into ChatGPT, Claude, Copilot, or any AI chat.
 
-Use **"Preview prompt"** to see the full prompt inline before copying.
+## System Audio Capture (Teams/Zoom/Meet)
 
-## Language Selection
+To transcribe meeting audio on macOS, route system audio through [BlackHole](https://github.com/ExistentialAudio/BlackHole):
 
-Both the Live and Upload tabs have a language dropdown. Choose the language being spoken for faster, more accurate transcription — or leave it on "Auto-detect" to let Whisper figure it out.
+1. `brew install blackhole-2ch`
+2. Open **Audio MIDI Setup** → Create Multi-Output Device (your speakers + BlackHole 2ch)
+3. Set the Multi-Output Device as system output
+4. In Hearnote, select **BlackHole 2ch** as input
 
-Supported languages: English, Spanish, Portuguese, French, German, Italian, Dutch, Japanese, Chinese, Korean, Arabic, Hindi, Russian.
+Full troubleshooting guide in the [wiki](https://github.com/papesce/hearnote/wiki) or see the detailed setup below.
 
-## System Audio Capture (Teams/Zoom)
+<details>
+<summary>Detailed BlackHole setup</summary>
 
-To transcribe audio from virtual meetings (Teams, Zoom, Google Meet) or any app playing audio on your Mac, you need to route system audio through a virtual loopback driver. Hearnote uses [BlackHole](https://github.com/ExistentialAudio/BlackHole) for this.
+### Create a Multi-Output Device
 
-### 1. Install BlackHole
+1. Open **Audio MIDI Setup** (Spotlight → "Audio MIDI Setup")
+2. Click **+** → **Create Multi-Output Device**
+3. Check both your regular output and **BlackHole 2ch**
+4. Ensure your regular output is first (drag to reorder)
+5. Rename to "Hearnote Output" (optional)
 
-```bash
-brew install blackhole-2ch
-```
+### Set as system output
 
-> If you don't use Homebrew, download the installer from https://github.com/ExistentialAudio/BlackHole/releases and run the `.pkg` file.
-
-After installing, restart your Mac or log out/log in to ensure the audio driver loads.
-
-### 2. Create a Multi-Output Device
-
-This lets you hear audio through your speakers/headphones **and** route it to Hearnote simultaneously.
-
-1. Open **Audio MIDI Setup** (Spotlight → type "Audio MIDI Setup")
-2. Click the **+** button in the bottom-left corner → **Create Multi-Output Device**
-3. In the right panel, check **both**:
-   - Your regular output (e.g. "MacBook Pro Speakers" or "External Headphones")
-   - **BlackHole 2ch**
-4. Make sure your regular output is listed **first** (drag to reorder) — this sets it as the clock source
-5. Optionally rename the device (right-click → "Rename") to something like "Hearnote Output"
-
-### 3. Set it as your system output
-
-- Open **System Settings → Sound → Output** and select your new Multi-Output Device
-- Alternatively, hold **Option** and click the volume icon in the menu bar to quickly switch
-
-> **Note:** The system volume slider doesn't work with Multi-Output Devices. Control volume through your individual output device or app-level controls.
-
-### 4. Select BlackHole in Hearnote
-
-1. Start Hearnote and open the app
-2. Click the audio source dropdown and select **BlackHole 2ch**
-3. Start your meeting or play audio — Hearnote will now capture the system audio
+System Settings → Sound → Output → select Multi-Output Device
 
 ### Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
-| BlackHole doesn't appear in Audio MIDI Setup | Restart your Mac after install; check System Settings → Privacy & Security for blocked extensions |
-| No audio captured | Verify the Multi-Output Device is set as system output, not just BlackHole alone |
-| Can't hear audio anymore | Make sure your speakers/headphones are checked in the Multi-Output Device |
-| Meeting app uses a different output | Some apps (Zoom, Teams) let you pick an output device in their settings — set it to the Multi-Output Device |
-| Choppy or glitchy audio | Ensure your regular output is the clock source (first in the list) in Audio MIDI Setup |
+| BlackHole not in Audio MIDI Setup | Restart Mac after install |
+| No audio captured | Verify Multi-Output Device is system output |
+| Can't hear audio | Check speakers are in Multi-Output Device |
+| Meeting app ignores system output | Set output in Zoom/Teams audio settings |
 
 ### Reverting
 
-To go back to normal audio (no routing to Hearnote):
+System Settings → Sound → Output → select your regular speakers.
 
-1. Open **System Settings → Sound → Output**
-2. Select your regular speakers or headphones directly
+</details>
 
 ## Requirements
 
-- Python 3.10–3.12
+- Python 3.10+
 - Node.js 18+ (for frontend build)
 - macOS (Intel or Apple Silicon)
 - Ollama (optional, for local AI summaries)
+
+## License
+
+[MIT](LICENSE)

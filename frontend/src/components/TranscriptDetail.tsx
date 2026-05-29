@@ -4,6 +4,7 @@ import { fetchTranscript, retranscribe } from '../api/client';
 import { TranscriptView } from './TranscriptView';
 import { SummaryPanel } from './SummaryPanel';
 import { AudioPlayer, type AudioPlayerHandle } from './AudioPlayer';
+import { ExportMenu } from './ExportMenu';
 import { LANGUAGES } from './SettingsBar';
 
 interface Props {
@@ -62,20 +63,27 @@ export function TranscriptDetail({ transcriptId }: Props) {
 
   return (
     <div className="space-y-4 animate-fade-in-up">
-      <div className="flex items-center gap-3 flex-wrap text-sm">
-        <span className={`px-2 py-0.5 rounded text-xs font-medium
-          ${detail.source === 'live' ? 'bg-success/20 text-success' : ''}
-          ${detail.source === 'upload' ? 'bg-accent/20 text-accent' : ''}
-          ${detail.source === 'retranscribe' ? 'bg-warning/20 text-warning' : ''}
-        `}>
-          {detail.source}
-        </span>
-        <span className="text-text-secondary">
-          {new Date(detail.timestamp).toLocaleString()}
-        </span>
-        {detail.filename && (
-          <span className="text-text-secondary">{detail.filename}</span>
-        )}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3 flex-wrap text-sm">
+          <span className={`px-2 py-0.5 rounded text-xs font-medium
+            ${detail.source === 'live' ? 'bg-success/20 text-success' : ''}
+            ${detail.source === 'upload' ? 'bg-accent/20 text-accent' : ''}
+            ${detail.source === 'retranscribe' ? 'bg-warning/20 text-warning' : ''}
+          `}>
+            {detail.source}
+          </span>
+          <span className="text-text-secondary">
+            {new Date(detail.timestamp).toLocaleString()}
+          </span>
+          {detail.filename && (
+            <span className="text-text-secondary">{detail.filename}</span>
+          )}
+        </div>
+        <ExportMenu
+          segments={detail.segments}
+          text={detail.text}
+          filename={detail.filename ?? detail.id}
+        />
       </div>
 
       {hasRecording && (

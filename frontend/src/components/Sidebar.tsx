@@ -19,9 +19,24 @@ interface Props {
   onCloseMobile?: () => void;
 }
 
+const PINNED_KEY = 'hearnote-pinned';
+
+function loadPinned(): Set<string> {
+  try {
+    const raw = localStorage.getItem(PINNED_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch { /* ignore */ }
+  return new Set();
+}
+
+function savePinned(ids: Set<string>) {
+  localStorage.setItem(PINNED_KEY, JSON.stringify([...ids]));
+}
+
 export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecording, onNewUpload, onCloseMobile }: Props) {
   const [transcripts, setTranscripts] = useState<TranscriptListItem[]>([]);
   const [search, setSearch] = useState('');
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(loadPinned);
   const { theme, toggle: toggleTheme } = useTheme();
 
   const load = useCallback(async () => {
@@ -42,6 +57,17 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
     e.stopPropagation();
     await deleteTranscript(id);
     load();
+  };
+
+  const handlePin = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setPinnedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      savePinned(next);
+      return next;
+    });
   };
 
   const handleSelect = (id: string) => {
@@ -65,6 +91,14 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
         (t.filename?.toLowerCase().includes(search.toLowerCase()))
       )
     : transcripts;
+
+  const sorted = [...filtered].sort((a, b) => {
+    const aPinned = pinnedIds.has(a.id);
+    const bPinned = pinnedIds.has(b.id);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+    return 0;
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -168,61 +202,79 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
             </button>
           </div>
         )}
-        {filtered.length === 0 && transcripts.length > 0 && (
+        {sorted.length === 0 && transcripts.length > 0 && (
           <p className="text-text-secondary text-xs text-center py-6">No results</p>
         )}
-        {filtered.map(t => (
-          <div
-            key={t.id}
-            role="listitem"
-            onClick={() => handleSelect(t.id)}
-            className={`px-3 py-2.5 rounded-lg mb-1 cursor-pointer transition-colors group
-              ${selectedId === t.id ? 'bg-accent/10 border border-accent/30' : 'hover:bg-bg-tertiary border border-transparent'}`}
-          >
-            <div className="flex items-center justify-between mb-0.5">
-              <div className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0
-                  ${t.source === 'live' ? 'bg-success' : ''}
-                  ${t.source === 'upload' ? 'bg-accent' : ''}
-                  ${t.source === 'retranscribe' ? 'bg-warning' : ''}
-                `} aria-label={`Source: ${t.source}`} />
-                <span className="text-xs text-text-secondary">
-                  {new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  {' '}
-                  {new Date(t.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                </span>
+        {sorted.map(t => {
+          const isPinned = pinnedIds.has(t.id);
+          return (
+            <div
+              key={t.id}
+              role="listitem"
+              onClick={() => handleSelect(t.id)}
+              className={`px-3 py-2.5 rounded-lg mb-1 cursor-pointer transition-colors group
+                ${selectedId === t.id ? 'bg-accent/10 border border-accent/30' : 'hover:bg-bg-tertiary border border-transparent'}`}
+            >
+              <div className="flex items-center justify-between mb-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0
+                    ${t.source === 'live' ? 'bg-success' : ''}
+                    ${t.source === 'upload' ? 'bg-accent' : ''}
+                    ${t.source === 'retranscribe' ? 'bg-warning' : ''}
+                  `} aria-label={`Source: ${t.source}`} />
+                  <span className="text-xs text-text-secondary">
+                    {new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    {' '}
+                    {new Date(t.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={(e) => handlePin(e, t.id)}
+                    className={`p-1 transition-all rounded ${isPinned ? 'text-warning opacity-100' : 'md:opacity-0 md:group-hover:opacity-100 opacity-70 text-text-secondary hover:text-warning'}`}
+                    title={isPinned ? 'Unpin' : 'Pin'}
+                    aria-label={isPinned ? 'Unpin transcript' : 'Pin transcript'}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill={isPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(e, t.id)}
+                    className="md:opacity-0 md:group-hover:opacity-100 opacity-70 p-1 text-text-secondary hover:text-error transition-all rounded"
+                    title="Delete transcript"
+                    aria-label="Delete transcript"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={(e) => handleDelete(e, t.id)}
-                className="md:opacity-0 md:group-hover:opacity-100 opacity-70 p-1 text-text-secondary hover:text-error transition-all rounded"
-                title="Delete transcript"
-                aria-label="Delete transcript"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" />
-                </svg>
-              </button>
-            </div>
-            {t.filename && (
-              <p className="text-xs text-text-secondary truncate mb-0.5">{t.filename}</p>
-            )}
-            <p className="text-xs text-text-primary truncate leading-relaxed mb-1">{t.preview}</p>
-            <div className="flex items-center gap-2 text-[10px] text-text-secondary">
-              {t.duration_seconds != null && (
-                <span className="flex items-center gap-0.5">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                  {formatDuration(t.duration_seconds)}
-                </span>
+              {t.filename && (
+                <p className="text-xs text-text-secondary truncate mb-0.5">{t.filename}</p>
               )}
-              {t.word_count > 0 && (
-                <span>{t.word_count.toLocaleString()} words</span>
-              )}
+              <p className="text-xs text-text-primary truncate leading-relaxed mb-1">{t.preview}</p>
+              <div className="flex items-center gap-2 text-[10px] text-text-secondary">
+                {isPinned && (
+                  <span className="text-warning">pinned</span>
+                )}
+                {t.duration_seconds != null && (
+                  <span className="flex items-center gap-0.5">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    {formatDuration(t.duration_seconds)}
+                  </span>
+                )}
+                {t.word_count > 0 && (
+                  <span>{t.word_count.toLocaleString()} words</span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

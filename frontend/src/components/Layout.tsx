@@ -1,31 +1,16 @@
 import { useState, type ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
-
-export type ActiveView = 'live' | 'upload' | 'detail';
+import { useRouter, type ActiveView } from '../hooks/useRouter';
 
 interface Props {
   children: (activeView: ActiveView, selectedTranscriptId: string | null) => ReactNode;
 }
 
+export type { ActiveView };
+
 export function Layout({ children }: Props) {
-  const [activeView, setActiveView] = useState<ActiveView>('live');
-  const [selectedTranscriptId, setSelectedTranscriptId] = useState<string | null>(null);
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const handleSelectTranscript = (id: string) => {
-    setSelectedTranscriptId(id);
-    setActiveView('detail');
-  };
-
-  const handleNewRecording = () => {
-    setSelectedTranscriptId(null);
-    setActiveView('live');
-  };
-
-  const handleNewUpload = () => {
-    setSelectedTranscriptId(null);
-    setActiveView('upload');
-  };
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -48,11 +33,11 @@ export function Layout({ children }: Props) {
         `}
       >
         <Sidebar
-          selectedId={selectedTranscriptId}
-          activeView={activeView}
-          onSelectTranscript={handleSelectTranscript}
-          onNewRecording={handleNewRecording}
-          onNewUpload={handleNewUpload}
+          selectedId={router.selectedTranscriptId}
+          activeView={router.activeView}
+          onSelectTranscript={router.selectTranscript}
+          onNewRecording={router.goToRecording}
+          onNewUpload={router.goToUpload}
           onCloseMobile={() => setSidebarOpen(false)}
         />
       </aside>
@@ -76,7 +61,7 @@ export function Layout({ children }: Props) {
         </div>
 
         <div className="max-w-[700px] mx-auto px-6 py-6">
-          {children(activeView, selectedTranscriptId)}
+          {children(router.activeView, router.selectedTranscriptId)}
         </div>
       </main>
     </div>

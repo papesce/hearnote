@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import type { TranscriptListItem } from '../types';
 import { fetchTranscripts, deleteTranscript } from '../api/client';
 
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 interface Props {
   selectedId: string | null;
   activeView: 'live' | 'upload' | 'detail';
@@ -149,7 +156,21 @@ export function Sidebar({ selectedId, activeView, onSelectTranscript, onNewRecor
             {t.filename && (
               <p className="text-xs text-text-secondary truncate mb-0.5">{t.filename}</p>
             )}
-            <p className="text-xs text-text-primary truncate leading-relaxed">{t.preview}</p>
+            <p className="text-xs text-text-primary truncate leading-relaxed mb-1">{t.preview}</p>
+            <div className="flex items-center gap-2 text-[10px] text-text-secondary">
+              {t.duration_seconds != null && (
+                <span className="flex items-center gap-0.5">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  {formatDuration(t.duration_seconds)}
+                </span>
+              )}
+              {t.word_count > 0 && (
+                <span>{t.word_count.toLocaleString()} words</span>
+              )}
+            </div>
           </div>
         ))}
       </div>

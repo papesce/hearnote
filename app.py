@@ -414,6 +414,13 @@ async def list_transcripts():
     for path in sorted(TRANSCRIPTS_DIR.glob("*.json"), reverse=True):
         try:
             data = json.loads(path.read_text())
+            text = data.get("text", "")
+            segments = data.get("segments")
+            duration = None
+            if segments:
+                ends = [s.get("end", 0) for s in segments]
+                if ends:
+                    duration = round(max(ends))
             transcripts.append({
                 "id": data["id"],
                 "timestamp": data["timestamp"],
@@ -421,6 +428,8 @@ async def list_transcripts():
                 "filename": data.get("filename"),
                 "preview": data["text"][:120],
                 "has_recording": data.get("has_recording", False) or bool(data.get("recording_ref")),
+                "duration_seconds": duration,
+                "word_count": len(text.split()) if text else 0,
             })
         except (json.JSONDecodeError, KeyError):
             continue

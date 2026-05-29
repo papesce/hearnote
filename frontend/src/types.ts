@@ -24,4 +24,6 @@ export interface TranscriptListItem {
   filename: string | null;
   preview: string;
   has_recording: boolean;
+  duration_seconds: number | null;
+  word_count: number;
 }
